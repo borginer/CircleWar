@@ -53,8 +53,10 @@ func main() {
 			mousePos := rl.GetMousePosition()
 			playerInput.PlayerActions = append(playerInput.PlayerActions, &gamepb.PlayerAction{Action: &gamepb.PlayerAction_Shoot{
 				Shoot: &gamepb.ShootAction{
-					X: mousePos.X,
-					Y: mousePos.Y,
+					Pos: &gamepb.Position{
+						X: mousePos.X,
+						Y: mousePos.Y,
+					},
 				},
 			}})
 		}

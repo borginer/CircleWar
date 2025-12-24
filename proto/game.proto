@@ -19,8 +19,7 @@ message MoveAction {
 
 message ShootAction {
   // shoot target coordinates
-  float x = 1;
-  float y = 2;
+  Position pos = 1;
 }
 
 message PlayerAction {
