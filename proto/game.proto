@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package game;
+
+option go_package = "gamepb/";
+
+enum Direction {
+  NONE  = 0;
+  LEFT  = 1;
+  RIGHT = 2;
+  UP    = 3;
+  DOWN  = 4;
+}
+
+message MoveAction {
+  Direction vert = 1;
+  Direction hori = 2;
+}
+
+message ShootAction {
+  // shoot target coordinates
+  float x = 1;
+  float y = 2;
+}
+
+message PlayerAction {
+  oneof action {
+    MoveAction  move  = 1;
+    ShootAction shoot = 2;
+  }
+}
+
+message PlayerInput {
+  repeated PlayerAction player_actions = 1;
+}
+
+message Position {
+  float x = 1;
+  float y = 2;
+
+}
+
+message PlayerState {
+  Position pos = 1;
+}
+
+message BulletState {
+  Position pos = 1;
+}
+
+message WorldState {
+  repeated PlayerState players = 1;
+  repeated BulletState bullets = 2;
+}
