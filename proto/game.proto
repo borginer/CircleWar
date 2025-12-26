@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package game;
 
-option go_package = "gamepb/";
+option go_package = "protob/";
 
 enum Direction {
   NONE  = 0;
@@ -36,7 +36,6 @@ message PlayerInput {
 message Position {
   float x = 1;
   float y = 2;
-
 }
 
 message PlayerState {

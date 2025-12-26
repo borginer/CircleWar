@@ -1,7 +1,7 @@
 package main
 
 import (
-	"CircleWar/gamepb"
+	"CircleWar/protob"
 	"fmt"
 	"log"
 	"net"
@@ -24,39 +24,39 @@ func main() {
 	rl.SetTargetFPS(400)
 
 	buf := make([]byte, 1024)
-	var world gamepb.WorldState
+	var world protob.WorldState
 	i := 0
 
 	for !rl.WindowShouldClose() {
-		playerInput := &gamepb.PlayerInput{}
+		playerInput := &protob.PlayerInput{}
 
 		// ### WASD ###
-		moveAction := &gamepb.MoveAction{
-			Vert: gamepb.Direction_NONE,
-			Hori: gamepb.Direction_NONE,
+		moveAction := &protob.MoveAction{
+			Vert: protob.Direction_NONE,
+			Hori: protob.Direction_NONE,
 		}
 		if rl.IsKeyDown(rl.KeyW) {
-			moveAction.Vert = gamepb.Direction_UP
+			moveAction.Vert = protob.Direction_UP
 		}
 		if rl.IsKeyDown(rl.KeyS) {
-			moveAction.Vert = gamepb.Direction_DOWN
+			moveAction.Vert = protob.Direction_DOWN
 		}
 		if rl.IsKeyDown(rl.KeyA) {
-			moveAction.Hori = gamepb.Direction_LEFT
+			moveAction.Hori = protob.Direction_LEFT
 		}
 		if rl.IsKeyDown(rl.KeyD) {
-			moveAction.Hori = gamepb.Direction_RIGHT
+			moveAction.Hori = protob.Direction_RIGHT
 		}
-		playerInput.PlayerActions = append(playerInput.PlayerActions, &gamepb.PlayerAction{Action: &gamepb.PlayerAction_Move{
+		playerInput.PlayerActions = append(playerInput.PlayerActions, &protob.PlayerAction{Action: &protob.PlayerAction_Move{
 			Move: moveAction,
 		}})
 
 		// ### Shoot with mouse ###
 		if rl.IsMouseButtonDown(rl.MouseButtonLeft) {
 			mousePos := rl.GetMousePosition()
-			playerInput.PlayerActions = append(playerInput.PlayerActions, &gamepb.PlayerAction{Action: &gamepb.PlayerAction_Shoot{
-				Shoot: &gamepb.ShootAction{
-					Pos: &gamepb.Position{
+			playerInput.PlayerActions = append(playerInput.PlayerActions, &protob.PlayerAction{Action: &protob.PlayerAction_Shoot{
+				Shoot: &protob.ShootAction{
+					Pos: &protob.Position{
 						X: mousePos.X,
 						Y: mousePos.Y,
 					},
@@ -65,16 +65,20 @@ func main() {
 		}
 
 		// Todo: add check later when server ticks happen independently of client packets
-		// if moveAction.Hori != gamepb.Direction_NONE && moveAction.Vert != gamepb.Direction_NONE {
+		// if moveAction.Hori != protob.Direction_NONE && moveAction.Vert != protob.Direction_NONE {
 
 		// }
 
-		data, _ := proto.Marshal(playerInput)
+		data, err := proto.Marshal(playerInput)
+		if err != nil {
+			log.Fatal(err)
+		}
 		conn.Write(data)
 
 		n, _, err := conn.ReadFromUDP(buf)
 		if err == nil {
-			proto.Unmarshal(buf[:n], &world)
+			fmt.Println("bytes from udp: ", n)
+			err = proto.Unmarshal(buf[:n], &world)	
 			i++
 			fmt.Printf("server update number %d at time: %s\n", i, time.Now().String())
 		}
@@ -88,11 +92,23 @@ func main() {
 				rl.DrawCircle(
 					int32(player.Pos.X),
 					int32(player.Pos.Y),
-					20,
+					26,
 					rl.Blue,
 				)
 			}
+		}
 
+		if world.Bullets != nil {
+			fmt.Println("bullets not null")
+			for _, bullet := range world.Bullets {
+				// fmt.Printf("x: %f, y: %f\n", player.Pos.X, player.Pos.Y)
+				rl.DrawCircle(
+					int32(bullet.Pos.X),
+					int32(bullet.Pos.Y),
+					14,
+					rl.Green,
+				)
+			}
 		}
 
 		rl.EndDrawing()
