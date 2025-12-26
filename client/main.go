@@ -2,8 +2,10 @@ package main
 
 import (
 	"CircleWar/gamepb"
+	"fmt"
 	"log"
 	"net"
+	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"google.golang.org/protobuf/proto"
@@ -19,10 +21,11 @@ func main() {
 
 	rl.InitWindow(1080, 640, "CircleWar Client")
 	defer rl.CloseWindow()
-	rl.SetTargetFPS(60)
+	rl.SetTargetFPS(400)
 
 	buf := make([]byte, 1024)
 	var world gamepb.WorldState
+	i := 0
 
 	for !rl.WindowShouldClose() {
 		playerInput := &gamepb.PlayerInput{}
@@ -72,6 +75,8 @@ func main() {
 		n, _, err := conn.ReadFromUDP(buf)
 		if err == nil {
 			proto.Unmarshal(buf[:n], &world)
+			i++
+			fmt.Printf("server update number %d at time: %s\n", i, time.Now().String())
 		}
 
 		rl.BeginDrawing()
@@ -79,6 +84,7 @@ func main() {
 
 		if world.Players != nil {
 			for _, player := range world.Players {
+				// fmt.Printf("x: %f, y: %f\n", player.Pos.X, player.Pos.Y)
 				rl.DrawCircle(
 					int32(player.Pos.X),
 					int32(player.Pos.Y),
