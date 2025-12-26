@@ -1,104 +1,147 @@
 package main
 
 import (
-	"CircleWar/gamepb"
+	"CircleWar/protob"
 	"fmt"
 	"log"
 	"math"
 	"net"
-	"sync"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 )
 
-type position struct {
-	x, y float32
-}
-
-type action int16
-type udpAddrStr string
+const port = 4000
+const ticksPerSecond = 60
+const bulletCooldownMS = 200
+const bulletSpeed = 1200
+const playerSpeed = 700
 
 const (
-	DIR_LEFT  action = 0
-	DIR_RIGHT action = 1
-	DIR_UP    action = 2
-	DIR_DOWN  action = 3
-	SHOOT     action = 4
+	DIR_LEFT  playerAction = 0
+	DIR_RIGHT playerAction = 1
+	DIR_UP    playerAction = 2
+	DIR_DOWN  playerAction = 3
+	SHOOT     playerAction = 4
 )
 
+type position struct{ x, y float32 }
+type vector2 struct{ x, y float32 }
+type playerAction int16
+type udpAddrStr string
+
+func (v vector2) normalized() vector2 {
+	length := math.Sqrt(math.Pow(float64(v.x), 2) + math.Pow(float64(v.y), 2))
+	return vector2{v.x / float32(length), v.y / float32(length)}
+}
+
 type playerInput struct {
-	actions map[action]bool
+	actions map[playerAction]bool
+	pos     position
 }
 
-type clientState struct {
-	pos position
+type playerState struct {
+	lastBulletShot time.Time
+	pos            position
 }
 
-type clientsInfo struct {
-	states    map[string]*clientState
-	addresses map[udpAddrStr]bool
-	mut       sync.Mutex
+type bulletState struct {
+	born    time.Time
+	pos     position
+	moveVec vector2
 }
 
-func (ci *clientsInfo) setAddress(addr udpAddrStr) {
-	ci.mut.Lock()
-	defer ci.mut.Unlock()
-	ci.addresses[addr] = true
+type clientInput struct {
+	addrStr udpAddrStr
+	input   playerInput
 }
 
-func (ci *clientsInfo) getAddressesCopy() []udpAddrStr {
-	copy := []udpAddrStr{}
-	ci.mut.Lock()
-	defer ci.mut.Unlock()
-	for addr := range ci.addresses {
-		copy = append(copy, addr)
+type serverWorld struct {
+	nextBulletId int
+	players      map[string]playerState
+	bullets      map[int]*bulletState
+	addresses    map[udpAddrStr]bool
+}
+
+func newServerWorld() serverWorld {
+	return serverWorld{
+		nextBulletId: 0,
+		players:      make(map[string]playerState),
+		bullets:      make(map[int]*bulletState),
+		addresses:    make(map[udpAddrStr]bool),
 	}
-	return copy
+
 }
 
-func (ci *clientsInfo) getStatesCopy() []clientState {
-	copy := []clientState{}
-	ci.mut.Lock()
-	defer ci.mut.Unlock()
-	for _, state := range ci.states {
-		copy = append(copy, *state)
+func (sw *serverWorld) addAddress(addr udpAddrStr) {
+	sw.addresses[addr] = true
+}
+
+func (sw *serverWorld) addressSnapshots() []udpAddrStr {
+	snapshot := []udpAddrStr{}
+	for addr := range sw.addresses {
+		snapshot = append(snapshot, addr)
 	}
-	return copy
+	return snapshot
 }
 
-func (ci *clientsInfo) setState(key string, state *clientState) {
-	ci.mut.Lock()
-	defer ci.mut.Unlock()
-	ci.states[key] = state
+func (sw *serverWorld) startPlayerBulletCD(addr udpAddrStr) {
+	playerState := sw.players[string(addr)]
+	playerState.lastBulletShot = time.Now()
+	sw.players[string(addr)] = playerState
 }
 
-func (ci *clientsInfo) getStateCopy(key string) clientState {
-	ci.mut.Lock()
-	defer ci.mut.Unlock()
-	return *ci.states[key]
+func (sw *serverWorld) durSinceLastBullet(addr udpAddrStr) time.Duration {
+	now := time.Now()
+	return now.Sub(sw.players[string(addr)].lastBulletShot)
 }
 
-func (ci *clientsInfo) hasState(key string) bool {
-	ci.mut.Lock()
-	defer ci.mut.Unlock()
-	_, ok := ci.states[key]
+func (sw *serverWorld) playerSnapshots() []playerState {
+	snapshot := []playerState{}
+	for _, state := range sw.players {
+		snapshot = append(snapshot, state)
+	}
+	return snapshot
+}
+
+func (sw *serverWorld) addPlayerState(key string, state playerState) {
+	sw.players[key] = state
+}
+
+func (sw *serverWorld) playerSnapshot(key string) playerState {
+	return sw.players[key]
+}
+
+func (sw *serverWorld) hasPlayerState(key string) bool {
+	_, ok := sw.players[key]
 	return ok
 }
 
-func moveDelta(inputs map[action]bool, delta float64) (float64, float64) {
-	const speed = 700
+func (sw *serverWorld) addBulletState(bullet bulletState) {
+	sw.bullets[sw.nextBulletId] = &bullet
+	sw.nextBulletId++
+}
+
+func (sw *serverWorld) bulletSnapshots() map[int]*bulletState {
+	return sw.bullets
+}
+
+func (sw *serverWorld) removeBullet(id int) {
+	delete(sw.bullets, id)
+}
+
+func moveDelta(inputs map[playerAction]bool, delta float64) (float64, float64) {
 	dx, dy := 0.0, 0.0
-	for act, _ := range inputs {
+	for act := range inputs {
 		switch act {
 		case DIR_LEFT:
-			dx = -speed
+			dx = -playerSpeed
 		case DIR_RIGHT:
-			dx = speed
+			dx = playerSpeed
 		case DIR_UP:
-			dy = -speed
+			dy = -playerSpeed
 		case DIR_DOWN:
-			dy = speed
+			dy = playerSpeed
 		default:
 			continue
 		}
@@ -113,11 +156,6 @@ func moveDelta(inputs map[action]bool, delta float64) (float64, float64) {
 	return dx * delta, dy * delta
 }
 
-type clientInput struct {
-	addrStr udpAddrStr
-	input   playerInput
-}
-
 func readHandler(conn *net.UDPConn, inputChan chan clientInput) {
 	buf := make([]byte, 1024)
 
@@ -127,65 +165,129 @@ func readHandler(conn *net.UDPConn, inputChan chan clientInput) {
 			continue
 		}
 
-		var pbInput gamepb.PlayerInput
+		var pbInput protob.PlayerInput
 		if err := proto.Unmarshal(buf[:n], &pbInput); err != nil {
 			continue
 		}
 
 		clientAddrStr := udpAddrStr(clientAddr.String())
 		playerIn := playerInput{
-			actions: make(map[action]bool),
+			actions: make(map[playerAction]bool),
 		}
 
 		for _, playerAct := range pbInput.PlayerActions {
 			switch act := playerAct.Action.(type) {
-			case *gamepb.PlayerAction_Move:
-				if act.Move.Vert == gamepb.Direction_DOWN {
+			case *protob.PlayerAction_Move:
+				if act.Move.Vert == protob.Direction_DOWN {
 					playerIn.actions[DIR_DOWN] = true
 				}
-				if act.Move.Vert == gamepb.Direction_UP {
+				if act.Move.Vert == protob.Direction_UP {
 					playerIn.actions[DIR_UP] = true
 				}
-				if act.Move.Hori == gamepb.Direction_RIGHT {
+				if act.Move.Hori == protob.Direction_RIGHT {
 					playerIn.actions[DIR_RIGHT] = true
 				}
-				if act.Move.Hori == gamepb.Direction_LEFT {
+				if act.Move.Hori == protob.Direction_LEFT {
 					playerIn.actions[DIR_LEFT] = true
 				}
 				break
-			case *gamepb.PlayerAction_Shoot:
+			case *protob.PlayerAction_Shoot:
 				playerIn.actions[SHOOT] = true
+				playerIn.pos = position{
+					playerAct.GetShoot().Pos.X,
+					playerAct.GetShoot().Pos.Y,
+				}
 				break
 			}
 		}
 
 		inputChan <- clientInput{
-			addrStr: clientAddrStr,
-			input:   playerIn,
+			clientAddrStr,
+			playerIn,
 		}
 	}
 }
 
-func main() {
-	const port = 4000
+func updateWorldState(serverWorld *serverWorld, clientInputs map[udpAddrStr]clientInput) {
+	for _, ci := range clientInputs {
+		dx, dy := moveDelta(ci.input.actions, float64(1)/ticksPerSecond)
+		state := serverWorld.playerSnapshot(string(ci.addrStr))
+		state.pos.x += float32(dx)
+		state.pos.y += float32(dy)
+		serverWorld.addPlayerState(string(ci.addrStr), state)
+
+		for act := range ci.input.actions {
+			if act == SHOOT {
+				fmt.Println("since last bullet: ", serverWorld.durSinceLastBullet(ci.addrStr))
+				if serverWorld.durSinceLastBullet(ci.addrStr) >
+					time.Duration(bulletCooldownMS)*time.Millisecond {
+					serverWorld.startPlayerBulletCD(ci.addrStr)
+					serverWorld.addBulletState(
+						bulletState{
+							time.Now(),
+							position{
+								state.pos.x,
+								state.pos.y,
+							},
+							vector2{
+								ci.input.pos.x - state.pos.x,
+								ci.input.pos.y - state.pos.y,
+							}.normalized(),
+						})
+				}
+			}
+		}
+	}
+
+	for i, bullet := range serverWorld.bulletSnapshots() {
+		// fmt.Printf("vector: (%f, %f)", bullet.moveVec.x, bullet.moveVec.y)
+		if time.Since(bullet.born) > 3*time.Second {
+			serverWorld.removeBullet(i)
+		}
+		bullet.pos.x += bullet.moveVec.x * bulletSpeed / ticksPerSecond
+		bullet.pos.y += bullet.moveVec.y * bulletSpeed / ticksPerSecond
+
+	}
+}
+
+func buildPBWorldState(serverWorld *serverWorld) *protob.WorldState {
+	pbWorld := &protob.WorldState{}
+
+	players := serverWorld.playerSnapshots()
+	for _, player := range players {
+		pbPlayer := protob.BuildPlayerState(player.pos.x, player.pos.y)
+		pbWorld.Players = append(pbWorld.Players, &pbPlayer)
+	}
+
+	fmt.Printf("bullets amount: %d\n", len(serverWorld.bulletSnapshots()))
+	for _, bullet := range serverWorld.bulletSnapshots() {
+		// fmt.Printf("building bullet at: (%f, %f)\n", bullet.pos.x, bullet.pos.y)
+		pbBullet := protob.BuildBulletState(bullet.pos.x, bullet.pos.y)
+		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
+	}
+
+	return pbWorld
+}
+
+func openUDPConn() *net.UDPConn {
 	addr := net.UDPAddr{
 		Port: port,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
+
 	conn, err := net.ListenUDP("udp", &addr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	return conn
+}
 
+func main() {
+	conn := openUDPConn()
+	defer conn.Close()
 	fmt.Printf("Listening on udp port %d\n", port)
 
-	clients_info := clientsInfo{
-		states:    make(map[string]*clientState),
-		addresses: make(map[udpAddrStr]bool),
-	}
-
-	const ticksPerSecond = 40
+	serverWorld := newServerWorld()
 	clock := time.Tick(time.Second / ticksPerSecond)
 
 	inputChan := make(chan clientInput)
@@ -197,41 +299,27 @@ func main() {
 		case tick := <-clock:
 			fmt.Println(tick)
 
-			for _, input := range clientInputs {
-				dx, dy := moveDelta(input.input.actions, float64(1)/ticksPerSecond)
-				state := clients_info.getStateCopy(string(input.addrStr))
-				state.pos.x += float32(dx)
-				state.pos.y += float32(dy)
-				clients_info.setState(string(input.addrStr), &state)
+			updateWorldState(&serverWorld, clientInputs)
+			clientInputs = make(map[udpAddrStr]clientInput)
+
+			pbWorld := buildPBWorldState(&serverWorld)
+			data, err := proto.Marshal(pbWorld)
+			if err != nil {
+				log.Fatal(err)
 			}
-
-			for uas := range clientInputs {
-				delete(clientInputs, uas)
-			}			
-
-			world := &gamepb.WorldState{}
-
-			client_states := clients_info.getStatesCopy()
-			for _, client := range client_states {
-				player := gamepb.BuildPlayerState(client.pos.x, client.pos.y)
-				fmt.Printf("pos before sending: %f, %f\n", player.Pos.X, player.Pos.Y)
-				world.Players = append(world.Players, &player)
-			}
-
-			data, _ := proto.Marshal(world)
-			client_addressses := clients_info.getAddressesCopy()
-			for _, addr := range client_addressses {
+			fmt.Printf("data size: %d\n", len(data))
+			for _, addr := range serverWorld.addressSnapshots() {
 				netAddr, _ := net.ResolveUDPAddr("udp", string(addr))
 				conn.WriteToUDP(data, netAddr)
 			}
+
 		case input := <-inputChan:
-			clients_info.setAddress(input.addrStr)
-			if !clients_info.hasState(string(input.addrStr)) {
-				clients_info.setState(string(input.addrStr), &clientState{
+			serverWorld.addAddress(input.addrStr)
+			if !serverWorld.hasPlayerState(string(input.addrStr)) {
+				serverWorld.addPlayerState(string(input.addrStr), playerState{
 					pos: position{x: 500, y: 500},
 				})
 			}
-
 			clientInputs[input.addrStr] = input
 		}
 	}
