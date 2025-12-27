@@ -1,7 +1,11 @@
 package main
 
 import (
-	"CircleWar/protob"
+	"CircleWar/config"
+	"CircleWar/geom"
+	"CircleWar/shared/protobuf"
+	"CircleWar/server/world_state"
+	stypes "CircleWar/shared/shared_types"
 	"fmt"
 	"log"
 	"math"
@@ -11,126 +15,38 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const port = 4000
-const ticksPerSecond = 60
-const bulletCooldownMS = 200
-const bulletSpeed = 1200
-const playerSpeed = 700
-
 const (
-	DIR_LEFT  playerAction = 0
-	DIR_RIGHT playerAction = 1
-	DIR_UP    playerAction = 2
-	DIR_DOWN  playerAction = 3
-	SHOOT     playerAction = 4
+	port        = config.Port
+	bulletSpeed = config.BulletSpeed
+	playerSpeed = config.PlayerSpeed
 )
 
-type position struct{ x, y float32 }
-type vector2 struct{ x, y float32 }
-type playerAction int16
-type udpAddrStr string
+const (
+	ticksPerSecond   = 60
+	bulletCooldownMS = 250
+)
 
-func (v vector2) normalized() vector2 {
-	length := math.Sqrt(math.Pow(float64(v.x), 2) + math.Pow(float64(v.y), 2))
-	return vector2{v.x / float32(length), v.y / float32(length)}
-}
+type actionType int16
+
+const (
+	DIR_LEFT  actionType = 0
+	DIR_RIGHT actionType = 1
+	DIR_UP    actionType = 2
+	DIR_DOWN  actionType = 3
+	SHOOT     actionType = 4
+)
 
 type playerInput struct {
-	actions map[playerAction]bool
-	pos     position
-}
-
-type playerState struct {
-	lastBulletShot time.Time
-	pos            position
-}
-
-type bulletState struct {
-	born    time.Time
-	pos     position
-	moveVec vector2
+	actions map[actionType]bool
+	pos     geom.Position
 }
 
 type clientInput struct {
-	addrStr udpAddrStr
+	addrStr stypes.UDPAddrStr
 	input   playerInput
 }
 
-type serverWorld struct {
-	nextBulletId int
-	players      map[string]playerState
-	bullets      map[int]*bulletState
-	addresses    map[udpAddrStr]bool
-}
-
-func newServerWorld() serverWorld {
-	return serverWorld{
-		nextBulletId: 0,
-		players:      make(map[string]playerState),
-		bullets:      make(map[int]*bulletState),
-		addresses:    make(map[udpAddrStr]bool),
-	}
-
-}
-
-func (sw *serverWorld) addAddress(addr udpAddrStr) {
-	sw.addresses[addr] = true
-}
-
-func (sw *serverWorld) addressSnapshots() []udpAddrStr {
-	snapshot := []udpAddrStr{}
-	for addr := range sw.addresses {
-		snapshot = append(snapshot, addr)
-	}
-	return snapshot
-}
-
-func (sw *serverWorld) startPlayerBulletCD(addr udpAddrStr) {
-	playerState := sw.players[string(addr)]
-	playerState.lastBulletShot = time.Now()
-	sw.players[string(addr)] = playerState
-}
-
-func (sw *serverWorld) durSinceLastBullet(addr udpAddrStr) time.Duration {
-	now := time.Now()
-	return now.Sub(sw.players[string(addr)].lastBulletShot)
-}
-
-func (sw *serverWorld) playerSnapshots() []playerState {
-	snapshot := []playerState{}
-	for _, state := range sw.players {
-		snapshot = append(snapshot, state)
-	}
-	return snapshot
-}
-
-func (sw *serverWorld) addPlayerState(key string, state playerState) {
-	sw.players[key] = state
-}
-
-func (sw *serverWorld) playerSnapshot(key string) playerState {
-	return sw.players[key]
-}
-
-func (sw *serverWorld) hasPlayerState(key string) bool {
-	_, ok := sw.players[key]
-	return ok
-}
-
-func (sw *serverWorld) addBulletState(bullet bulletState) {
-	sw.bullets[sw.nextBulletId] = &bullet
-	sw.nextBulletId++
-}
-
-func (sw *serverWorld) bulletSnapshots() map[int]*bulletState {
-	return sw.bullets
-}
-
-func (sw *serverWorld) removeBullet(id int) {
-	delete(sw.bullets, id)
-}
-
-func moveDelta(inputs map[playerAction]bool, delta float64) (float64, float64) {
+func moveDelta(inputs map[actionType]bool, delta float64) (float64, float64) {
 	dx, dy := 0.0, 0.0
 	for act := range inputs {
 		switch act {
@@ -156,47 +72,48 @@ func moveDelta(inputs map[playerAction]bool, delta float64) (float64, float64) {
 	return dx * delta, dy * delta
 }
 
-func readHandler(conn *net.UDPConn, inputChan chan clientInput) {
+func clientInputHandler(conn *net.UDPConn, inputChan chan clientInput) {
 	buf := make([]byte, 1024)
-
 	for {
 		n, clientAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			continue
 		}
 
-		var pbInput protob.PlayerInput
+		fmt.Println("player input recieved")
+
+		var pbInput protobuf.PlayerInput
 		if err := proto.Unmarshal(buf[:n], &pbInput); err != nil {
 			continue
 		}
 
-		clientAddrStr := udpAddrStr(clientAddr.String())
+		clientAddrStr := stypes.UDPAddrStr(clientAddr.String())
 		playerIn := playerInput{
-			actions: make(map[playerAction]bool),
+			actions: make(map[actionType]bool),
 		}
 
 		for _, playerAct := range pbInput.PlayerActions {
 			switch act := playerAct.Action.(type) {
-			case *protob.PlayerAction_Move:
-				if act.Move.Vert == protob.Direction_DOWN {
+			case *protobuf.PlayerAction_Move:
+				if act.Move.Vert == protobuf.Direction_DOWN {
 					playerIn.actions[DIR_DOWN] = true
 				}
-				if act.Move.Vert == protob.Direction_UP {
+				if act.Move.Vert == protobuf.Direction_UP {
 					playerIn.actions[DIR_UP] = true
 				}
-				if act.Move.Hori == protob.Direction_RIGHT {
+				if act.Move.Hori == protobuf.Direction_RIGHT {
 					playerIn.actions[DIR_RIGHT] = true
 				}
-				if act.Move.Hori == protob.Direction_LEFT {
+				if act.Move.Hori == protobuf.Direction_LEFT {
 					playerIn.actions[DIR_LEFT] = true
 				}
 				break
-			case *protob.PlayerAction_Shoot:
+			case *protobuf.PlayerAction_Shoot:
 				playerIn.actions[SHOOT] = true
-				playerIn.pos = position{
+				playerIn.pos = geom.NewPosition(
 					playerAct.GetShoot().Pos.X,
 					playerAct.GetShoot().Pos.Y,
-				}
+				)
 				break
 			}
 		}
@@ -208,61 +125,55 @@ func readHandler(conn *net.UDPConn, inputChan chan clientInput) {
 	}
 }
 
-func updateWorldState(serverWorld *serverWorld, clientInputs map[udpAddrStr]clientInput) {
+func updateWorldState(serverWorld *worldstate.ServerWorld, clientInputs map[stypes.UDPAddrStr]clientInput) {
 	for _, ci := range clientInputs {
 		dx, dy := moveDelta(ci.input.actions, float64(1)/ticksPerSecond)
-		state := serverWorld.playerSnapshot(string(ci.addrStr))
-		state.pos.x += float32(dx)
-		state.pos.y += float32(dy)
-		serverWorld.addPlayerState(string(ci.addrStr), state)
+		state := serverWorld.PlayerSnapshot(string(ci.addrStr))
+		state.Pos = state.Pos.Add(float32(dx), float32(dy))
+		serverWorld.AddPlayerState(string(ci.addrStr), state)
 
 		for act := range ci.input.actions {
 			if act == SHOOT {
-				fmt.Println("since last bullet: ", serverWorld.durSinceLastBullet(ci.addrStr))
-				if serverWorld.durSinceLastBullet(ci.addrStr) >
+				fmt.Println("since last bullet: ", serverWorld.DurSinceLastBullet(ci.addrStr))
+				if serverWorld.DurSinceLastBullet(ci.addrStr) >
 					time.Duration(bulletCooldownMS)*time.Millisecond {
-					serverWorld.startPlayerBulletCD(ci.addrStr)
-					serverWorld.addBulletState(
-						bulletState{
-							time.Now(),
-							position{
-								state.pos.x,
-								state.pos.y,
-							},
-							vector2{
-								ci.input.pos.x - state.pos.x,
-								ci.input.pos.y - state.pos.y,
-							}.normalized(),
+					serverWorld.StartPlayerBulletCD(ci.addrStr)
+					serverWorld.AddBulletState(
+						worldstate.BulletState{
+							Born:    time.Now(),
+							Pos:     geom.NewPosition(state.Pos.X, state.Pos.Y),
+							MoveDir: geom.NewDir(ci.input.pos.X-state.Pos.X, ci.input.pos.Y-state.Pos.Y),
 						})
 				}
 			}
 		}
 	}
 
-	for i, bullet := range serverWorld.bulletSnapshots() {
+	for i, bullet := range serverWorld.BulletSnapshots() {
 		// fmt.Printf("vector: (%f, %f)", bullet.moveVec.x, bullet.moveVec.y)
-		if time.Since(bullet.born) > 3*time.Second {
-			serverWorld.removeBullet(i)
+		if time.Since(bullet.Born) > 3*time.Second {
+			serverWorld.RemoveBullet(i)
 		}
-		bullet.pos.x += bullet.moveVec.x * bulletSpeed / ticksPerSecond
-		bullet.pos.y += bullet.moveVec.y * bulletSpeed / ticksPerSecond
-
+		bullet.Pos = bullet.Pos.Add(
+			bullet.MoveDir.X*bulletSpeed/ticksPerSecond,
+			bullet.MoveDir.Y*bulletSpeed/ticksPerSecond,
+		)
 	}
 }
 
-func buildPBWorldState(serverWorld *serverWorld) *protob.WorldState {
-	pbWorld := &protob.WorldState{}
+func buildPBWorldState(serverWorld *worldstate.ServerWorld) *protobuf.WorldState {
+	pbWorld := &protobuf.WorldState{}
 
-	players := serverWorld.playerSnapshots()
+	players := serverWorld.PlayerSnapshots()
 	for _, player := range players {
-		pbPlayer := protob.BuildPlayerState(player.pos.x, player.pos.y)
+		pbPlayer := protobuf.BuildPlayerState(player.Pos.X, player.Pos.Y)
 		pbWorld.Players = append(pbWorld.Players, &pbPlayer)
 	}
 
-	fmt.Printf("bullets amount: %d\n", len(serverWorld.bulletSnapshots()))
-	for _, bullet := range serverWorld.bulletSnapshots() {
+	fmt.Printf("bullets amount: %d\n", len(serverWorld.BulletSnapshots()))
+	for _, bullet := range serverWorld.BulletSnapshots() {
 		// fmt.Printf("building bullet at: (%f, %f)\n", bullet.pos.x, bullet.pos.y)
-		pbBullet := protob.BuildBulletState(bullet.pos.x, bullet.pos.y)
+		pbBullet := protobuf.BuildBulletState(bullet.Pos.X, bullet.Pos.Y)
 		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
 	}
 
@@ -287,20 +198,20 @@ func main() {
 	defer conn.Close()
 	fmt.Printf("Listening on udp port %d\n", port)
 
-	serverWorld := newServerWorld()
+	serverWorld := worldstate.NewServerWorld()
 	clock := time.Tick(time.Second / ticksPerSecond)
 
 	inputChan := make(chan clientInput)
-	go readHandler(conn, inputChan)
+	go clientInputHandler(conn, inputChan)
 
-	clientInputs := make(map[udpAddrStr]clientInput)
+	clientInputs := make(map[stypes.UDPAddrStr]clientInput)
 	for {
 		select {
 		case tick := <-clock:
 			fmt.Println(tick)
 
 			updateWorldState(&serverWorld, clientInputs)
-			clientInputs = make(map[udpAddrStr]clientInput)
+			clientInputs = make(map[stypes.UDPAddrStr]clientInput)
 
 			pbWorld := buildPBWorldState(&serverWorld)
 			data, err := proto.Marshal(pbWorld)
@@ -308,16 +219,16 @@ func main() {
 				log.Fatal(err)
 			}
 			fmt.Printf("data size: %d\n", len(data))
-			for _, addr := range serverWorld.addressSnapshots() {
+			for _, addr := range serverWorld.AddressSnapshots() {
 				netAddr, _ := net.ResolveUDPAddr("udp", string(addr))
 				conn.WriteToUDP(data, netAddr)
 			}
 
 		case input := <-inputChan:
-			serverWorld.addAddress(input.addrStr)
-			if !serverWorld.hasPlayerState(string(input.addrStr)) {
-				serverWorld.addPlayerState(string(input.addrStr), playerState{
-					pos: position{x: 500, y: 500},
+			serverWorld.AddAddress(input.addrStr)
+			if !serverWorld.HasPlayerState(string(input.addrStr)) {
+				serverWorld.AddPlayerState(string(input.addrStr), worldstate.PlayerState{
+					Pos: geom.NewPosition(500, 500),
 				})
 			}
 			clientInputs[input.addrStr] = input

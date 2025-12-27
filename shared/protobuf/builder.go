@@ -1,4 +1,4 @@
-package protob
+package protobuf
 
 func BuildPlayerState(x, y float32) PlayerState {
 	return PlayerState{
