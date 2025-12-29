@@ -2,7 +2,9 @@ package main
 
 import (
 	"CircleWar/config"
+	"CircleWar/shared/hitboxes"
 	"CircleWar/shared/protobuf"
+	sharedtypes "CircleWar/shared/types"
 	"fmt"
 	"log"
 	"net"
@@ -24,7 +26,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	rl.InitWindow(1920, 1080, "CircleWar Client")
+	rl.InitWindow(1320, 860, "CircleWar Client")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(400)
 
@@ -95,10 +97,12 @@ func main() {
 
 		if world.Players != nil {
 			for _, player := range world.Players {
+				fmt.Println("player health:", player.Health, "size: ", hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)))
+
 				rl.DrawCircle(
 					int32(player.Pos.X),
 					int32(player.Pos.Y),
-					48,
+					hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)),
 					rl.Blue,
 				)
 			}
@@ -107,11 +111,12 @@ func main() {
 		if world.Bullets != nil {
 			fmt.Println("bullets not null")
 			for _, bullet := range world.Bullets {
+				fmt.Println("bullet size: ", bullet.Size)
 				rl.DrawCircle(
 					int32(bullet.Pos.X),
 					int32(bullet.Pos.Y),
-					12,
-					rl.Black,
+					bullet.Size,
+					rl.Blue,
 				)
 			}
 		}

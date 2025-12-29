@@ -354,6 +354,7 @@ func (x *Position) GetY() float32 {
 type PlayerState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pos           *Position              `protobuf:"bytes,1,opt,name=pos,proto3" json:"pos,omitempty"`
+	Health        uint32                 `protobuf:"varint,2,opt,name=health,proto3" json:"health,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -395,9 +396,17 @@ func (x *PlayerState) GetPos() *Position {
 	return nil
 }
 
+func (x *PlayerState) GetHealth() uint32 {
+	if x != nil {
+		return x.Health
+	}
+	return 0
+}
+
 type BulletState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pos           *Position              `protobuf:"bytes,1,opt,name=pos,proto3" json:"pos,omitempty"`
+	Size          float32                `protobuf:"fixed32,2,opt,name=size,proto3" json:"size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -437,6 +446,13 @@ func (x *BulletState) GetPos() *Position {
 		return x.Pos
 	}
 	return nil
+}
+
+func (x *BulletState) GetSize() float32 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
 }
 
 type WorldState struct {
@@ -510,11 +526,13 @@ const file_proto_src_game_proto_rawDesc = "" +
 	"\x0eplayer_actions\x18\x01 \x03(\v2\x13.proto.PlayerActionR\rplayerActions\"&\n" +
 	"\bPosition\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x02R\x01y\"0\n" +
+	"\x01y\x18\x02 \x01(\x02R\x01y\"H\n" +
 	"\vPlayerState\x12!\n" +
-	"\x03pos\x18\x01 \x01(\v2\x0f.proto.PositionR\x03pos\"0\n" +
+	"\x03pos\x18\x01 \x01(\v2\x0f.proto.PositionR\x03pos\x12\x16\n" +
+	"\x06health\x18\x02 \x01(\rR\x06health\"D\n" +
 	"\vBulletState\x12!\n" +
-	"\x03pos\x18\x01 \x01(\v2\x0f.proto.PositionR\x03pos\"h\n" +
+	"\x03pos\x18\x01 \x01(\v2\x0f.proto.PositionR\x03pos\x12\x12\n" +
+	"\x04size\x18\x02 \x01(\x02R\x04size\"h\n" +
 	"\n" +
 	"WorldState\x12,\n" +
 	"\aplayers\x18\x01 \x03(\v2\x12.proto.PlayerStateR\aplayers\x12,\n" +

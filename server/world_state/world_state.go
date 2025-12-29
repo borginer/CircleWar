@@ -1,8 +1,10 @@
 package worldstate
 
 import (
+	"CircleWar/config"
 	"CircleWar/geom"
-	stypes "CircleWar/shared/shared_types"
+	sharedtypes "CircleWar/shared/types"
+	stypes "CircleWar/shared/types"
 	"time"
 )
 
@@ -13,6 +15,17 @@ import (
 type PlayerState struct {
 	LastBulletShot time.Time
 	Pos            geom.Position
+	Health         sharedtypes.PlayerHealth
+	Addr           stypes.UDPAddrStr
+	Id             uint
+}
+
+var nextPlayerId uint = uint(1)
+
+func NewPlayerState(pos geom.Position, addr stypes.UDPAddrStr) PlayerState {
+	ps := PlayerState{time.Now(), pos, config.InitialPlayerHealth, addr, nextPlayerId}
+	nextPlayerId += 1
+	return ps
 }
 
 // func (playerState) ObjectType() string {
@@ -20,9 +33,11 @@ type PlayerState struct {
 // }
 
 type BulletState struct {
-	Born    time.Time
-	Pos     geom.Position
-	MoveDir geom.Direction
+	PlayerId uint
+	Born     time.Time
+	Pos      geom.Position
+	MoveDir  geom.Direction
+	Size     float32
 }
 
 // func (bulletState) ObjectType() string {
@@ -44,6 +59,10 @@ func NewServerWorld() ServerWorld {
 		addresses:    make(map[stypes.UDPAddrStr]bool),
 	}
 
+}
+
+func (p *PlayerState) ChangePlayerHealth(by int) {
+	p.Health += stypes.PlayerHealth(by)
 }
 
 func (sw *ServerWorld) AddAddress(addr stypes.UDPAddrStr) {
@@ -79,6 +98,10 @@ func (sw *ServerWorld) PlayerSnapshots() []PlayerState {
 
 func (sw *ServerWorld) AddPlayerState(key string, state PlayerState) {
 	sw.players[key] = state
+}
+
+func (sw *ServerWorld) RemovePlayerState(key string) {
+	delete(sw.players, key)
 }
 
 func (sw *ServerWorld) PlayerSnapshot(key string) PlayerState {

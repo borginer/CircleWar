@@ -40,10 +40,12 @@ message Position {
 
 message PlayerState {
   Position pos = 1;
+  uint32 health = 2;
 }
 
 message BulletState {
   Position pos = 1;
+  float size = 2;
 }
 
 message WorldState {
