@@ -2,11 +2,11 @@ package main
 
 import (
 	"CircleWar/config"
-	"CircleWar/geom"
-	"CircleWar/server/world_state"
-	"CircleWar/shared/hitboxes"
-	"CircleWar/shared/protobuf"
-	stypes "CircleWar/shared/types"
+	"CircleWar/core/geom"
+	"CircleWar/core/hitboxes"
+	"CircleWar/core/protobuf"
+	stypes "CircleWar/core/types"
+	worldstate "CircleWar/server/world_state"
 	"fmt"
 	"log"
 	"math"
@@ -53,7 +53,7 @@ func (moveAction) ActionType() actionType {
 }
 
 type shootAction struct {
-	target geom.Position
+	target geom.Vector2
 }
 
 func (shootAction) ActionType() actionType {
@@ -133,7 +133,7 @@ func clientInputHandler(conn *net.UDPConn, inputChan chan clientInput) {
 				break
 			case *protobuf.PlayerAction_Shoot:
 				playerIn.actions = append(playerIn.actions, shootAction{
-					geom.NewPosition(
+					geom.NewVector(
 						playerAct.GetShoot().Pos.X,
 						playerAct.GetShoot().Pos.Y,
 					),
@@ -159,7 +159,7 @@ func calculateHits(serverWorld *worldstate.ServerWorld) {
 			bulletRad := hitboxes.BulletSize(player.Health)
 			playerPos := player.Pos
 			bulletPos := bullet.Pos
-			if playerPos.DistTo(bulletPos) < (playerRad+bulletRad)*0.85 {
+			if playerPos.DistTo(bulletPos) < (playerRad+bulletRad)*0.9 {
 				player.ChangePlayerHealth(-1)
 				fmt.Println("player health:", player.Health)
 				if int(player.Health) <= 0 {
@@ -174,50 +174,46 @@ func calculateHits(serverWorld *worldstate.ServerWorld) {
 	}
 }
 
-func updateWorldState(serverWorld *worldstate.ServerWorld, clientInputs map[stypes.UDPAddrStr]clientInput) {
+func registerClientInputs(serverWorld *worldstate.ServerWorld, clientInput *clientInput) {
+	dirMap := make(map[moveDirection]bool)
+	for _, action := range clientInput.input.actions {
+		switch act := action.(type) {
+		case moveAction:
+			dirMap[act.dir] = true
+			break
+		case shootAction:
+			// fmt.Println("since last bullet: ", serverWorld.DurSinceLastBullet(ci.addrStr))
+			if serverWorld.DurSinceLastBullet(clientInput.addrStr) > time.Duration(config.BulletCooldownMS)*time.Millisecond {
+				playerState := serverWorld.PlayerSnapshot(string(clientInput.addrStr))
+				serverWorld.StartPlayerBulletCD(clientInput.addrStr)
+				// fmt.Println("shoot!", act.target)
+				serverWorld.AddBulletState(worldstate.NewBulletState(playerState, act.target))
+			}
+			break
+		}
+	}
+	dx, dy := moveDelta(dirMap, 1.0/ticksPerSecond)
+	state := serverWorld.PlayerSnapshot(string(clientInput.addrStr))
+	state.Pos = state.Pos.Add(dx, dy)
+	serverWorld.AddPlayerState(string(clientInput.addrStr), state)
+
+}
+
+func updateWorldState(serverWorld *worldstate.ServerWorld, clientsInputs map[stypes.UDPAddrStr]clientInput) {
 	for i, bullet := range serverWorld.BulletSnapshots() {
 		// fmt.Printf("vector: (%f, %f)", bullet.moveVec.x, bullet.moveVec.y)
 		if time.Since(bullet.Born) > time.Duration(config.BulletTimeToLiveSec*float64(time.Second)) {
 			serverWorld.RemoveBullet(i)
 		}
-		fmt.Println("shooting", bullet.MoveDir.X*bulletSpeed/ticksPerSecond, bullet.MoveDir.Y*bulletSpeed/ticksPerSecond)
+		// fmt.Println("shooting", bullet.MoveDir.X*bulletSpeed/ticksPerSecond, bullet.MoveDir.Y*bulletSpeed/ticksPerSecond)
 
 		bullet.Pos = bullet.Pos.Add(
-			bullet.MoveDir.X*bulletSpeed/ticksPerSecond,
-			bullet.MoveDir.Y*bulletSpeed/ticksPerSecond,
+			bullet.MoveDir.ScalarMult(bulletSpeed / ticksPerSecond).Coord(),
 		)
 	}
 
-	for _, ci := range clientInputs {
-		dirMap := make(map[moveDirection]bool)
-		for _, action := range ci.input.actions {
-			switch act := action.(type) {
-			case moveAction:
-				dirMap[act.dir] = true
-				break
-			case shootAction:
-				fmt.Println("since last bullet: ", serverWorld.DurSinceLastBullet(ci.addrStr))
-				if serverWorld.DurSinceLastBullet(ci.addrStr) > time.Duration(config.BulletCooldownMS)*time.Millisecond {
-					playerState := serverWorld.PlayerSnapshot(string(ci.addrStr))
-					playerPos := playerState.Pos
-					serverWorld.StartPlayerBulletCD(ci.addrStr)
-					fmt.Println("shoot!", act.target)
-					serverWorld.AddBulletState(
-						worldstate.BulletState{
-							PlayerId: playerState.Id,	
-							Born:    time.Now(),
-							Pos:     geom.NewPosition(playerPos.X, playerPos.Y),
-							MoveDir: geom.NewDir(act.target.X-playerPos.X, act.target.Y-playerPos.Y),
-							Size:    hitboxes.BulletSize(playerState.Health),
-						})
-				}
-				break
-			}
-		}
-		dx, dy := moveDelta(dirMap, 1.0/ticksPerSecond)
-		state := serverWorld.PlayerSnapshot(string(ci.addrStr))
-		state.Pos = state.Pos.Add(dx, dy)
-		serverWorld.AddPlayerState(string(ci.addrStr), state)
+	for _, ci := range clientsInputs {
+		registerClientInputs(serverWorld, &ci)
 	}
 
 	calculateHits(serverWorld)
@@ -229,14 +225,16 @@ func buildPBWorldState(serverWorld *worldstate.ServerWorld) *protobuf.WorldState
 	players := serverWorld.PlayerSnapshots()
 	for _, player := range players {
 		fmt.Println("sending player: ", player)
-		pbPlayer := protobuf.BuildPlayerState(player.Pos.X, player.Pos.Y, player.Health)
+		px, py := player.Pos.Coord()
+		pbPlayer := protobuf.BuildPlayerState(px, py, player.Health)
 		pbWorld.Players = append(pbWorld.Players, &pbPlayer)
 	}
 
 	fmt.Printf("bullets amount: %d\n", len(serverWorld.BulletSnapshots()))
 	for _, bullet := range serverWorld.BulletSnapshots() {
 		// fmt.Printf("building bullet at: (%f, %f)\n", bullet.pos.x, bullet.pos.y)
-		pbBullet := protobuf.BuildBulletState(bullet.Pos.X, bullet.Pos.Y, bullet.Size)
+		bx, by := bullet.Pos.Coord()
+		pbBullet := protobuf.BuildBulletState(bx, by, bullet.Size)
 		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
 	}
 
@@ -246,7 +244,7 @@ func buildPBWorldState(serverWorld *worldstate.ServerWorld) *protobuf.WorldState
 func openUDPConn() *net.UDPConn {
 	addr := net.UDPAddr{
 		Port: port,
-		IP:   net.ParseIP("0.0.0.0"),
+		IP:   net.ParseIP(config.ServerIP),
 	}
 
 	conn, err := net.ListenUDP("udp", &addr)
@@ -294,7 +292,7 @@ func main() {
 			serverWorld.AddAddress(input.addrStr)
 			if !serverWorld.HasPlayerState(string(input.addrStr)) {
 				serverWorld.AddPlayerState(string(input.addrStr), worldstate.NewPlayerState(
-					geom.NewPosition(500, 500),
+					geom.NewVector(500, 500),
 					input.addrStr,
 				))
 			}

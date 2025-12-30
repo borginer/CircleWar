@@ -2,9 +2,10 @@ package worldstate
 
 import (
 	"CircleWar/config"
-	"CircleWar/geom"
-	sharedtypes "CircleWar/shared/types"
-	stypes "CircleWar/shared/types"
+	"CircleWar/core/hitboxes"
+	sharedtypes "CircleWar/core/types"
+	stypes "CircleWar/core/types"
+	"CircleWar/core/geom"
 	"time"
 )
 
@@ -14,7 +15,7 @@ import (
 
 type PlayerState struct {
 	LastBulletShot time.Time
-	Pos            geom.Position
+	Pos            geom.Vector2
 	Health         sharedtypes.PlayerHealth
 	Addr           stypes.UDPAddrStr
 	Id             uint
@@ -22,7 +23,7 @@ type PlayerState struct {
 
 var nextPlayerId uint = uint(1)
 
-func NewPlayerState(pos geom.Position, addr stypes.UDPAddrStr) PlayerState {
+func NewPlayerState(pos geom.Vector2, addr stypes.UDPAddrStr) PlayerState {
 	ps := PlayerState{time.Now(), pos, config.InitialPlayerHealth, addr, nextPlayerId}
 	nextPlayerId += 1
 	return ps
@@ -35,9 +36,19 @@ func NewPlayerState(pos geom.Position, addr stypes.UDPAddrStr) PlayerState {
 type BulletState struct {
 	PlayerId uint
 	Born     time.Time
-	Pos      geom.Position
+	Pos      geom.Vector2
 	MoveDir  geom.Direction
 	Size     float32
+}
+
+func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
+	return BulletState{
+		PlayerId: player.Id,
+		Born:     time.Now(),
+		Pos:      player.Pos,
+		MoveDir:  geom.NewDir(target.Sub(player.Pos)),
+		Size:     hitboxes.BulletSize(player.Health),
+	}
 }
 
 // func (bulletState) ObjectType() string {

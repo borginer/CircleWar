@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package proto;
 
-option go_package = "shared/protobuf/";
+option go_package = "core/protobuf/";
 
 enum Direction {
   NONE  = 0;
@@ -39,13 +39,13 @@ message Position {
 }
 
 message PlayerState {
-  Position pos = 1;
-  uint32 health = 2;
+  Position pos    = 1;
+  uint32   health = 2;
 }
 
 message BulletState {
-  Position pos = 1;
-  float size = 2;
+  Position pos  = 1;
+  float    size = 2;
 }
 
 message WorldState {

@@ -2,7 +2,7 @@ package hitboxes
 
 import (
 	"CircleWar/config"
-	sharedtypes "CircleWar/shared/types"
+	sharedtypes "CircleWar/core/types"
 )
 
 func PlayerSize(health sharedtypes.PlayerHealth) float32 {

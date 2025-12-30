@@ -2,9 +2,9 @@ package main
 
 import (
 	"CircleWar/config"
-	"CircleWar/shared/hitboxes"
-	"CircleWar/shared/protobuf"
-	sharedtypes "CircleWar/shared/types"
+	"CircleWar/core/hitboxes"
+	"CircleWar/core/protobuf"
+	sharedtypes "CircleWar/core/types"
 	"fmt"
 	"log"
 	"net"
@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	port = config.Port
+	port     = config.Port
+	serverIP = config.ServerIP
 )
 
 func main() {
-	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", port))
+	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", serverIP, port))
 	conn, err := net.DialUDP("udp", nil, serverAddr)
 	if err != nil {
 		log.Fatal(err)

@@ -1,7 +1,7 @@
 package protobuf
 
 import (
-	sharedtypes "CircleWar/shared/types"
+	sharedtypes "CircleWar/core/types"
 )
 
 func BuildPlayerState(x, y float32, health sharedtypes.PlayerHealth) PlayerState {

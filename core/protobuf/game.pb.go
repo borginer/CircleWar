@@ -7,11 +7,12 @@
 package protobuf
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -542,7 +543,7 @@ const file_proto_src_game_proto_rawDesc = "" +
 	"\x04LEFT\x10\x01\x12\t\n" +
 	"\x05RIGHT\x10\x02\x12\x06\n" +
 	"\x02UP\x10\x03\x12\b\n" +
-	"\x04DOWN\x10\x04B\x12Z\x10shared/protobuf/b\x06proto3"
+	"\x04DOWN\x10\x04B\x10Z\x0ecore/protobuf/b\x06proto3"
 
 var (
 	file_proto_src_game_proto_rawDescOnce sync.Once
