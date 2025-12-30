@@ -118,24 +118,24 @@ func clientInputHandler(conn *net.UDPConn, inputChan chan clientInput) {
 		for _, playerAct := range pbInput.PlayerActions {
 			switch act := playerAct.Action.(type) {
 			case *protobuf.PlayerAction_Move:
-				if act.Move.Vert == protobuf.Direction_DOWN {
+				if act.Move.Dir == protobuf.Direction_DOWN {
 					playerIn.actions = append(playerIn.actions, moveAction{DIR_DOWN})
 				}
-				if act.Move.Vert == protobuf.Direction_UP {
+				if act.Move.Dir == protobuf.Direction_UP {
 					playerIn.actions = append(playerIn.actions, moveAction{DIR_UP})
 				}
-				if act.Move.Hori == protobuf.Direction_RIGHT {
+				if act.Move.Dir == protobuf.Direction_RIGHT {
 					playerIn.actions = append(playerIn.actions, moveAction{DIR_RIGHT})
 				}
-				if act.Move.Hori == protobuf.Direction_LEFT {
+				if act.Move.Dir == protobuf.Direction_LEFT {
 					playerIn.actions = append(playerIn.actions, moveAction{DIR_LEFT})
 				}
 				break
 			case *protobuf.PlayerAction_Shoot:
 				playerIn.actions = append(playerIn.actions, shootAction{
 					geom.NewVector(
-						playerAct.GetShoot().Pos.X,
-						playerAct.GetShoot().Pos.Y,
+						playerAct.GetShoot().Target.X,
+						playerAct.GetShoot().Target.Y,
 					),
 				})
 				break
@@ -155,14 +155,14 @@ func calculateHits(serverWorld *worldstate.ServerWorld) {
 			if bullet.PlayerId == player.Id {
 				continue
 			}
-			playerRad := hitboxes.PlayerSize(player.Health)
-			bulletRad := hitboxes.BulletSize(player.Health)
+			playerRad := hitboxes.PlayerSize(player.Health())
+			bulletRad := hitboxes.BulletSize(player.Health())
 			playerPos := player.Pos
 			bulletPos := bullet.Pos
 			if playerPos.DistTo(bulletPos) < (playerRad+bulletRad)*0.9 {
-				player.ChangePlayerHealth(-1)
-				fmt.Println("player health:", player.Health)
-				if int(player.Health) <= 0 {
+				player.ChangeHealth(-1)
+				fmt.Println("player health:", player.Health())
+				if int(player.Health()) <= 0 {
 					fmt.Println("removing player")
 					serverWorld.RemovePlayerState(string(player.Addr))
 				} else {
@@ -174,7 +174,19 @@ func calculateHits(serverWorld *worldstate.ServerWorld) {
 	}
 }
 
-func registerClientInputs(serverWorld *worldstate.ServerWorld, clientInput *clientInput) {
+func movePlayer(serverWorld *worldstate.ServerWorld, addr stypes.UDPAddrStr, dx, dy float32) {
+	player := serverWorld.PlayerSnapshot(string(addr))
+	playerSize := hitboxes.PlayerSize(player.Health())
+	player.Pos = player.Pos.Add(dx, dy).Limited(
+		playerSize,
+		playerSize,
+		serverWorld.Width()-playerSize,
+		serverWorld.Height()-playerSize,
+	)
+	serverWorld.AddPlayerState(string(addr), player)
+}
+
+func handleClientInputs(serverWorld *worldstate.ServerWorld, clientInput *clientInput) {
 	dirMap := make(map[moveDirection]bool)
 	for _, action := range clientInput.input.actions {
 		switch act := action.(type) {
@@ -193,10 +205,7 @@ func registerClientInputs(serverWorld *worldstate.ServerWorld, clientInput *clie
 		}
 	}
 	dx, dy := moveDelta(dirMap, 1.0/ticksPerSecond)
-	state := serverWorld.PlayerSnapshot(string(clientInput.addrStr))
-	state.Pos = state.Pos.Add(dx, dy)
-	serverWorld.AddPlayerState(string(clientInput.addrStr), state)
-
+	movePlayer(serverWorld, clientInput.addrStr, dx, dy)
 }
 
 func updateWorldState(serverWorld *worldstate.ServerWorld, clientsInputs map[stypes.UDPAddrStr]clientInput) {
@@ -213,7 +222,7 @@ func updateWorldState(serverWorld *worldstate.ServerWorld, clientsInputs map[sty
 	}
 
 	for _, ci := range clientsInputs {
-		registerClientInputs(serverWorld, &ci)
+		handleClientInputs(serverWorld, &ci)
 	}
 
 	calculateHits(serverWorld)
@@ -225,16 +234,14 @@ func buildPBWorldState(serverWorld *worldstate.ServerWorld) *protobuf.WorldState
 	players := serverWorld.PlayerSnapshots()
 	for _, player := range players {
 		fmt.Println("sending player: ", player)
-		px, py := player.Pos.Coord()
-		pbPlayer := protobuf.BuildPlayerState(px, py, player.Health)
+		pbPlayer := protobuf.BuildPlayerState(player.Pos, player.Health())
 		pbWorld.Players = append(pbWorld.Players, &pbPlayer)
 	}
 
 	fmt.Printf("bullets amount: %d\n", len(serverWorld.BulletSnapshots()))
 	for _, bullet := range serverWorld.BulletSnapshots() {
 		// fmt.Printf("building bullet at: (%f, %f)\n", bullet.pos.x, bullet.pos.y)
-		bx, by := bullet.Pos.Coord()
-		pbBullet := protobuf.BuildBulletState(bx, by, bullet.Size)
+		pbBullet := protobuf.BuildBulletState(bullet.Pos, bullet.Size)
 		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
 	}
 

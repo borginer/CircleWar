@@ -2,17 +2,16 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.2
-// source: proto_src/game.proto
+// source: core/protobuf/proto_src/game.proto
 
 package protobuf
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -61,11 +60,11 @@ func (x Direction) String() string {
 }
 
 func (Direction) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_src_game_proto_enumTypes[0].Descriptor()
+	return file_core_protobuf_proto_src_game_proto_enumTypes[0].Descriptor()
 }
 
 func (Direction) Type() protoreflect.EnumType {
-	return &file_proto_src_game_proto_enumTypes[0]
+	return &file_core_protobuf_proto_src_game_proto_enumTypes[0]
 }
 
 func (x Direction) Number() protoreflect.EnumNumber {
@@ -74,20 +73,19 @@ func (x Direction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Direction.Descriptor instead.
 func (Direction) EnumDescriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{0}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{0}
 }
 
 type MoveAction struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Vert          Direction              `protobuf:"varint,1,opt,name=vert,proto3,enum=proto.Direction" json:"vert,omitempty"`
-	Hori          Direction              `protobuf:"varint,2,opt,name=hori,proto3,enum=proto.Direction" json:"hori,omitempty"`
+	Dir           Direction              `protobuf:"varint,1,opt,name=dir,proto3,enum=proto.Direction" json:"dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MoveAction) Reset() {
 	*x = MoveAction{}
-	mi := &file_proto_src_game_proto_msgTypes[0]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +97,7 @@ func (x *MoveAction) String() string {
 func (*MoveAction) ProtoMessage() {}
 
 func (x *MoveAction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[0]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,19 +110,12 @@ func (x *MoveAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveAction.ProtoReflect.Descriptor instead.
 func (*MoveAction) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{0}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MoveAction) GetVert() Direction {
+func (x *MoveAction) GetDir() Direction {
 	if x != nil {
-		return x.Vert
-	}
-	return Direction_NONE
-}
-
-func (x *MoveAction) GetHori() Direction {
-	if x != nil {
-		return x.Hori
+		return x.Dir
 	}
 	return Direction_NONE
 }
@@ -132,14 +123,14 @@ func (x *MoveAction) GetHori() Direction {
 type ShootAction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// shoot target coordinates
-	Pos           *Position `protobuf:"bytes,1,opt,name=pos,proto3" json:"pos,omitempty"`
+	Target        *Position `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ShootAction) Reset() {
 	*x = ShootAction{}
-	mi := &file_proto_src_game_proto_msgTypes[1]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -151,7 +142,7 @@ func (x *ShootAction) String() string {
 func (*ShootAction) ProtoMessage() {}
 
 func (x *ShootAction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[1]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -164,12 +155,12 @@ func (x *ShootAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShootAction.ProtoReflect.Descriptor instead.
 func (*ShootAction) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{1}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *ShootAction) GetPos() *Position {
+func (x *ShootAction) GetTarget() *Position {
 	if x != nil {
-		return x.Pos
+		return x.Target
 	}
 	return nil
 }
@@ -187,7 +178,7 @@ type PlayerAction struct {
 
 func (x *PlayerAction) Reset() {
 	*x = PlayerAction{}
-	mi := &file_proto_src_game_proto_msgTypes[2]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -199,7 +190,7 @@ func (x *PlayerAction) String() string {
 func (*PlayerAction) ProtoMessage() {}
 
 func (x *PlayerAction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[2]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -212,7 +203,7 @@ func (x *PlayerAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerAction.ProtoReflect.Descriptor instead.
 func (*PlayerAction) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{2}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PlayerAction) GetAction() isPlayerAction_Action {
@@ -265,7 +256,7 @@ type PlayerInput struct {
 
 func (x *PlayerInput) Reset() {
 	*x = PlayerInput{}
-	mi := &file_proto_src_game_proto_msgTypes[3]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -277,7 +268,7 @@ func (x *PlayerInput) String() string {
 func (*PlayerInput) ProtoMessage() {}
 
 func (x *PlayerInput) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[3]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -290,7 +281,7 @@ func (x *PlayerInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerInput.ProtoReflect.Descriptor instead.
 func (*PlayerInput) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{3}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PlayerInput) GetPlayerActions() []*PlayerAction {
@@ -310,7 +301,7 @@ type Position struct {
 
 func (x *Position) Reset() {
 	*x = Position{}
-	mi := &file_proto_src_game_proto_msgTypes[4]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -322,7 +313,7 @@ func (x *Position) String() string {
 func (*Position) ProtoMessage() {}
 
 func (x *Position) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[4]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -335,7 +326,7 @@ func (x *Position) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Position.ProtoReflect.Descriptor instead.
 func (*Position) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{4}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Position) GetX() float32 {
@@ -362,7 +353,7 @@ type PlayerState struct {
 
 func (x *PlayerState) Reset() {
 	*x = PlayerState{}
-	mi := &file_proto_src_game_proto_msgTypes[5]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +365,7 @@ func (x *PlayerState) String() string {
 func (*PlayerState) ProtoMessage() {}
 
 func (x *PlayerState) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[5]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +378,7 @@ func (x *PlayerState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerState.ProtoReflect.Descriptor instead.
 func (*PlayerState) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{5}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PlayerState) GetPos() *Position {
@@ -414,7 +405,7 @@ type BulletState struct {
 
 func (x *BulletState) Reset() {
 	*x = BulletState{}
-	mi := &file_proto_src_game_proto_msgTypes[6]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -426,7 +417,7 @@ func (x *BulletState) String() string {
 func (*BulletState) ProtoMessage() {}
 
 func (x *BulletState) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[6]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -439,7 +430,7 @@ func (x *BulletState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BulletState.ProtoReflect.Descriptor instead.
 func (*BulletState) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{6}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BulletState) GetPos() *Position {
@@ -466,7 +457,7 @@ type WorldState struct {
 
 func (x *WorldState) Reset() {
 	*x = WorldState{}
-	mi := &file_proto_src_game_proto_msgTypes[7]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -478,7 +469,7 @@ func (x *WorldState) String() string {
 func (*WorldState) ProtoMessage() {}
 
 func (x *WorldState) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_src_game_proto_msgTypes[7]
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -491,7 +482,7 @@ func (x *WorldState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorldState.ProtoReflect.Descriptor instead.
 func (*WorldState) Descriptor() ([]byte, []int) {
-	return file_proto_src_game_proto_rawDescGZIP(), []int{7}
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *WorldState) GetPlayers() []*PlayerState {
@@ -508,17 +499,16 @@ func (x *WorldState) GetBullets() []*BulletState {
 	return nil
 }
 
-var File_proto_src_game_proto protoreflect.FileDescriptor
+var File_core_protobuf_proto_src_game_proto protoreflect.FileDescriptor
 
-const file_proto_src_game_proto_rawDesc = "" +
+const file_core_protobuf_proto_src_game_proto_rawDesc = "" +
 	"\n" +
-	"\x14proto_src/game.proto\x12\x05proto\"X\n" +
+	"\"core/protobuf/proto_src/game.proto\x12\x05proto\"0\n" +
 	"\n" +
-	"MoveAction\x12$\n" +
-	"\x04vert\x18\x01 \x01(\x0e2\x10.proto.DirectionR\x04vert\x12$\n" +
-	"\x04hori\x18\x02 \x01(\x0e2\x10.proto.DirectionR\x04hori\"0\n" +
-	"\vShootAction\x12!\n" +
-	"\x03pos\x18\x01 \x01(\v2\x0f.proto.PositionR\x03pos\"m\n" +
+	"MoveAction\x12\"\n" +
+	"\x03dir\x18\x01 \x01(\x0e2\x10.proto.DirectionR\x03dir\"6\n" +
+	"\vShootAction\x12'\n" +
+	"\x06target\x18\x01 \x01(\v2\x0f.proto.PositionR\x06target\"m\n" +
 	"\fPlayerAction\x12'\n" +
 	"\x04move\x18\x01 \x01(\v2\x11.proto.MoveActionH\x00R\x04move\x12*\n" +
 	"\x05shoot\x18\x02 \x01(\v2\x12.proto.ShootActionH\x00R\x05shootB\b\n" +
@@ -546,20 +536,20 @@ const file_proto_src_game_proto_rawDesc = "" +
 	"\x04DOWN\x10\x04B\x10Z\x0ecore/protobuf/b\x06proto3"
 
 var (
-	file_proto_src_game_proto_rawDescOnce sync.Once
-	file_proto_src_game_proto_rawDescData []byte
+	file_core_protobuf_proto_src_game_proto_rawDescOnce sync.Once
+	file_core_protobuf_proto_src_game_proto_rawDescData []byte
 )
 
-func file_proto_src_game_proto_rawDescGZIP() []byte {
-	file_proto_src_game_proto_rawDescOnce.Do(func() {
-		file_proto_src_game_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_src_game_proto_rawDesc), len(file_proto_src_game_proto_rawDesc)))
+func file_core_protobuf_proto_src_game_proto_rawDescGZIP() []byte {
+	file_core_protobuf_proto_src_game_proto_rawDescOnce.Do(func() {
+		file_core_protobuf_proto_src_game_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_core_protobuf_proto_src_game_proto_rawDesc), len(file_core_protobuf_proto_src_game_proto_rawDesc)))
 	})
-	return file_proto_src_game_proto_rawDescData
+	return file_core_protobuf_proto_src_game_proto_rawDescData
 }
 
-var file_proto_src_game_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_src_game_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_proto_src_game_proto_goTypes = []any{
+var file_core_protobuf_proto_src_game_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_core_protobuf_proto_src_game_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_core_protobuf_proto_src_game_proto_goTypes = []any{
 	(Direction)(0),       // 0: proto.Direction
 	(*MoveAction)(nil),   // 1: proto.MoveAction
 	(*ShootAction)(nil),  // 2: proto.ShootAction
@@ -570,30 +560,29 @@ var file_proto_src_game_proto_goTypes = []any{
 	(*BulletState)(nil),  // 7: proto.BulletState
 	(*WorldState)(nil),   // 8: proto.WorldState
 }
-var file_proto_src_game_proto_depIdxs = []int32{
-	0,  // 0: proto.MoveAction.vert:type_name -> proto.Direction
-	0,  // 1: proto.MoveAction.hori:type_name -> proto.Direction
-	5,  // 2: proto.ShootAction.pos:type_name -> proto.Position
-	1,  // 3: proto.PlayerAction.move:type_name -> proto.MoveAction
-	2,  // 4: proto.PlayerAction.shoot:type_name -> proto.ShootAction
-	3,  // 5: proto.PlayerInput.player_actions:type_name -> proto.PlayerAction
-	5,  // 6: proto.PlayerState.pos:type_name -> proto.Position
-	5,  // 7: proto.BulletState.pos:type_name -> proto.Position
-	6,  // 8: proto.WorldState.players:type_name -> proto.PlayerState
-	7,  // 9: proto.WorldState.bullets:type_name -> proto.BulletState
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+var file_core_protobuf_proto_src_game_proto_depIdxs = []int32{
+	0, // 0: proto.MoveAction.dir:type_name -> proto.Direction
+	5, // 1: proto.ShootAction.target:type_name -> proto.Position
+	1, // 2: proto.PlayerAction.move:type_name -> proto.MoveAction
+	2, // 3: proto.PlayerAction.shoot:type_name -> proto.ShootAction
+	3, // 4: proto.PlayerInput.player_actions:type_name -> proto.PlayerAction
+	5, // 5: proto.PlayerState.pos:type_name -> proto.Position
+	5, // 6: proto.BulletState.pos:type_name -> proto.Position
+	6, // 7: proto.WorldState.players:type_name -> proto.PlayerState
+	7, // 8: proto.WorldState.bullets:type_name -> proto.BulletState
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
-func init() { file_proto_src_game_proto_init() }
-func file_proto_src_game_proto_init() {
-	if File_proto_src_game_proto != nil {
+func init() { file_core_protobuf_proto_src_game_proto_init() }
+func file_core_protobuf_proto_src_game_proto_init() {
+	if File_core_protobuf_proto_src_game_proto != nil {
 		return
 	}
-	file_proto_src_game_proto_msgTypes[2].OneofWrappers = []any{
+	file_core_protobuf_proto_src_game_proto_msgTypes[2].OneofWrappers = []any{
 		(*PlayerAction_Move)(nil),
 		(*PlayerAction_Shoot)(nil),
 	}
@@ -601,18 +590,18 @@ func file_proto_src_game_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_src_game_proto_rawDesc), len(file_proto_src_game_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_protobuf_proto_src_game_proto_rawDesc), len(file_core_protobuf_proto_src_game_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_proto_src_game_proto_goTypes,
-		DependencyIndexes: file_proto_src_game_proto_depIdxs,
-		EnumInfos:         file_proto_src_game_proto_enumTypes,
-		MessageInfos:      file_proto_src_game_proto_msgTypes,
+		GoTypes:           file_core_protobuf_proto_src_game_proto_goTypes,
+		DependencyIndexes: file_core_protobuf_proto_src_game_proto_depIdxs,
+		EnumInfos:         file_core_protobuf_proto_src_game_proto_enumTypes,
+		MessageInfos:      file_core_protobuf_proto_src_game_proto_msgTypes,
 	}.Build()
-	File_proto_src_game_proto = out.File
-	file_proto_src_game_proto_goTypes = nil
-	file_proto_src_game_proto_depIdxs = nil
+	File_core_protobuf_proto_src_game_proto = out.File
+	file_core_protobuf_proto_src_game_proto_goTypes = nil
+	file_core_protobuf_proto_src_game_proto_depIdxs = nil
 }

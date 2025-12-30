@@ -20,6 +20,20 @@ func (v Vector2) DistTo(other Vector2) float32 {
 	return float32(math.Sqrt(math.Pow(float64(v.X-other.X), 2) + math.Pow(float64(v.Y-other.Y), 2)))
 }
 
+func limit(value, ll, ul float32) float32 {
+	if value < ll {
+		return ll
+	} else if value > ul {
+		return ul
+	}
+	return value
+}
+
+// limits vector coordinates to the given parameters (a square)
+func (v Vector2) Limited(lx, ly, ux, uy float32) Vector2 {
+	return NewVector(limit(v.X, lx, ux), limit(v.Y, ly, uy))
+}
+
 func (v Vector2) normalized() Vector2 {
 	length := math.Sqrt(math.Pow(float64(v.X), 2) + math.Pow(float64(v.Y), 2))
 	if length == 0 {

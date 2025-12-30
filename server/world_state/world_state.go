@@ -2,10 +2,10 @@ package worldstate
 
 import (
 	"CircleWar/config"
+	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
 	sharedtypes "CircleWar/core/types"
 	stypes "CircleWar/core/types"
-	"CircleWar/core/geom"
 	"time"
 )
 
@@ -16,9 +16,17 @@ import (
 type PlayerState struct {
 	LastBulletShot time.Time
 	Pos            geom.Vector2
-	Health         sharedtypes.PlayerHealth
+	health         sharedtypes.PlayerHealth
 	Addr           stypes.UDPAddrStr
 	Id             uint
+}
+
+func (ps PlayerState) Health() sharedtypes.PlayerHealth {
+	return ps.health
+}
+
+func (ps *PlayerState) ChangeHealth(by int) {
+	ps.health += stypes.PlayerHealth(by)
 }
 
 var nextPlayerId uint = uint(1)
@@ -47,7 +55,7 @@ func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
 		Born:     time.Now(),
 		Pos:      player.Pos,
 		MoveDir:  geom.NewDir(target.Sub(player.Pos)),
-		Size:     hitboxes.BulletSize(player.Health),
+		Size:     hitboxes.BulletSize(player.Health()),
 	}
 }
 
@@ -56,10 +64,11 @@ func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
 // }
 
 type ServerWorld struct {
-	nextBulletId int
-	players      map[string]PlayerState
-	bullets      map[int]*BulletState
-	addresses    map[stypes.UDPAddrStr]bool
+	nextBulletId  int
+	players       map[string]PlayerState
+	bullets       map[int]*BulletState
+	addresses     map[stypes.UDPAddrStr]bool
+	height, width float32
 }
 
 func NewServerWorld() ServerWorld {
@@ -68,12 +77,17 @@ func NewServerWorld() ServerWorld {
 		players:      make(map[string]PlayerState),
 		bullets:      make(map[int]*BulletState),
 		addresses:    make(map[stypes.UDPAddrStr]bool),
+		height:       config.WorldHeight,
+		width:        config.WorldWidth,
 	}
-
 }
 
-func (p *PlayerState) ChangePlayerHealth(by int) {
-	p.Health += stypes.PlayerHealth(by)
+func (sw *ServerWorld) Width() float32 {
+	return sw.width
+}
+
+func (sw *ServerWorld) Height() float32 {
+	return sw.height
 }
 
 func (sw *ServerWorld) AddAddress(addr stypes.UDPAddrStr) {
