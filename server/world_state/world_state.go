@@ -125,6 +125,11 @@ func (sw *ServerWorld) AddPlayerState(key string, state PlayerState) {
 	sw.players[key] = state
 }
 
+func (sw *ServerWorld) HasPlayer(key string) bool {
+	_, ok := sw.players[key]
+	return ok
+}
+
 func (sw *ServerWorld) RemovePlayerState(key string) {
 	delete(sw.players, key)
 }

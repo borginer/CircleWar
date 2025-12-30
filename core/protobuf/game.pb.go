@@ -499,6 +499,208 @@ func (x *WorldState) GetBullets() []*BulletState {
 	return nil
 }
 
+type ConnectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GameName      string                 `protobuf:"bytes,1,opt,name=game_name,json=gameName,proto3" json:"game_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnectRequest) Reset() {
+	*x = ConnectRequest{}
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectRequest) ProtoMessage() {}
+
+func (x *ConnectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectRequest.ProtoReflect.Descriptor instead.
+func (*ConnectRequest) Descriptor() ([]byte, []int) {
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ConnectRequest) GetGameName() string {
+	if x != nil {
+		return x.GameName
+	}
+	return ""
+}
+
+type ConnectAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlayerId      uint32                 `protobuf:"varint,1,opt,name=player_id,json=playerId,proto3" json:"player_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnectAck) Reset() {
+	*x = ConnectAck{}
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectAck) ProtoMessage() {}
+
+func (x *ConnectAck) ProtoReflect() protoreflect.Message {
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectAck.ProtoReflect.Descriptor instead.
+func (*ConnectAck) Descriptor() ([]byte, []int) {
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ConnectAck) GetPlayerId() uint32 {
+	if x != nil {
+		return x.PlayerId
+	}
+	return 0
+}
+
+type GameMessage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*GameMessage_World
+	//	*GameMessage_PlayerInput
+	//	*GameMessage_ConnectRequest
+	//	*GameMessage_ConnectAck
+	Payload       isGameMessage_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GameMessage) Reset() {
+	*x = GameMessage{}
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GameMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GameMessage) ProtoMessage() {}
+
+func (x *GameMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_core_protobuf_proto_src_game_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GameMessage.ProtoReflect.Descriptor instead.
+func (*GameMessage) Descriptor() ([]byte, []int) {
+	return file_core_protobuf_proto_src_game_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GameMessage) GetPayload() isGameMessage_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *GameMessage) GetWorld() *WorldState {
+	if x != nil {
+		if x, ok := x.Payload.(*GameMessage_World); ok {
+			return x.World
+		}
+	}
+	return nil
+}
+
+func (x *GameMessage) GetPlayerInput() *PlayerInput {
+	if x != nil {
+		if x, ok := x.Payload.(*GameMessage_PlayerInput); ok {
+			return x.PlayerInput
+		}
+	}
+	return nil
+}
+
+func (x *GameMessage) GetConnectRequest() *ConnectRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*GameMessage_ConnectRequest); ok {
+			return x.ConnectRequest
+		}
+	}
+	return nil
+}
+
+func (x *GameMessage) GetConnectAck() *ConnectAck {
+	if x != nil {
+		if x, ok := x.Payload.(*GameMessage_ConnectAck); ok {
+			return x.ConnectAck
+		}
+	}
+	return nil
+}
+
+type isGameMessage_Payload interface {
+	isGameMessage_Payload()
+}
+
+type GameMessage_World struct {
+	World *WorldState `protobuf:"bytes,1,opt,name=world,proto3,oneof"`
+}
+
+type GameMessage_PlayerInput struct {
+	PlayerInput *PlayerInput `protobuf:"bytes,2,opt,name=player_input,json=playerInput,proto3,oneof"`
+}
+
+type GameMessage_ConnectRequest struct {
+	ConnectRequest *ConnectRequest `protobuf:"bytes,3,opt,name=connect_request,json=connectRequest,proto3,oneof"`
+}
+
+type GameMessage_ConnectAck struct {
+	ConnectAck *ConnectAck `protobuf:"bytes,4,opt,name=connect_ack,json=connectAck,proto3,oneof"`
+}
+
+func (*GameMessage_World) isGameMessage_Payload() {}
+
+func (*GameMessage_PlayerInput) isGameMessage_Payload() {}
+
+func (*GameMessage_ConnectRequest) isGameMessage_Payload() {}
+
+func (*GameMessage_ConnectAck) isGameMessage_Payload() {}
+
 var File_core_protobuf_proto_src_game_proto protoreflect.FileDescriptor
 
 const file_core_protobuf_proto_src_game_proto_rawDesc = "" +
@@ -527,7 +729,19 @@ const file_core_protobuf_proto_src_game_proto_rawDesc = "" +
 	"\n" +
 	"WorldState\x12,\n" +
 	"\aplayers\x18\x01 \x03(\v2\x12.proto.PlayerStateR\aplayers\x12,\n" +
-	"\abullets\x18\x02 \x03(\v2\x12.proto.BulletStateR\abullets*<\n" +
+	"\abullets\x18\x02 \x03(\v2\x12.proto.BulletStateR\abullets\"-\n" +
+	"\x0eConnectRequest\x12\x1b\n" +
+	"\tgame_name\x18\x01 \x01(\tR\bgameName\")\n" +
+	"\n" +
+	"ConnectAck\x12\x1b\n" +
+	"\tplayer_id\x18\x01 \x01(\rR\bplayerId\"\xf4\x01\n" +
+	"\vGameMessage\x12)\n" +
+	"\x05world\x18\x01 \x01(\v2\x11.proto.WorldStateH\x00R\x05world\x127\n" +
+	"\fplayer_input\x18\x02 \x01(\v2\x12.proto.PlayerInputH\x00R\vplayerInput\x12@\n" +
+	"\x0fconnect_request\x18\x03 \x01(\v2\x15.proto.ConnectRequestH\x00R\x0econnectRequest\x124\n" +
+	"\vconnect_ack\x18\x04 \x01(\v2\x11.proto.ConnectAckH\x00R\n" +
+	"connectAckB\t\n" +
+	"\apayload*<\n" +
 	"\tDirection\x12\b\n" +
 	"\x04NONE\x10\x00\x12\b\n" +
 	"\x04LEFT\x10\x01\x12\t\n" +
@@ -548,33 +762,40 @@ func file_core_protobuf_proto_src_game_proto_rawDescGZIP() []byte {
 }
 
 var file_core_protobuf_proto_src_game_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_core_protobuf_proto_src_game_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_core_protobuf_proto_src_game_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_core_protobuf_proto_src_game_proto_goTypes = []any{
-	(Direction)(0),       // 0: proto.Direction
-	(*MoveAction)(nil),   // 1: proto.MoveAction
-	(*ShootAction)(nil),  // 2: proto.ShootAction
-	(*PlayerAction)(nil), // 3: proto.PlayerAction
-	(*PlayerInput)(nil),  // 4: proto.PlayerInput
-	(*Position)(nil),     // 5: proto.Position
-	(*PlayerState)(nil),  // 6: proto.PlayerState
-	(*BulletState)(nil),  // 7: proto.BulletState
-	(*WorldState)(nil),   // 8: proto.WorldState
+	(Direction)(0),         // 0: proto.Direction
+	(*MoveAction)(nil),     // 1: proto.MoveAction
+	(*ShootAction)(nil),    // 2: proto.ShootAction
+	(*PlayerAction)(nil),   // 3: proto.PlayerAction
+	(*PlayerInput)(nil),    // 4: proto.PlayerInput
+	(*Position)(nil),       // 5: proto.Position
+	(*PlayerState)(nil),    // 6: proto.PlayerState
+	(*BulletState)(nil),    // 7: proto.BulletState
+	(*WorldState)(nil),     // 8: proto.WorldState
+	(*ConnectRequest)(nil), // 9: proto.ConnectRequest
+	(*ConnectAck)(nil),     // 10: proto.ConnectAck
+	(*GameMessage)(nil),    // 11: proto.GameMessage
 }
 var file_core_protobuf_proto_src_game_proto_depIdxs = []int32{
-	0, // 0: proto.MoveAction.dir:type_name -> proto.Direction
-	5, // 1: proto.ShootAction.target:type_name -> proto.Position
-	1, // 2: proto.PlayerAction.move:type_name -> proto.MoveAction
-	2, // 3: proto.PlayerAction.shoot:type_name -> proto.ShootAction
-	3, // 4: proto.PlayerInput.player_actions:type_name -> proto.PlayerAction
-	5, // 5: proto.PlayerState.pos:type_name -> proto.Position
-	5, // 6: proto.BulletState.pos:type_name -> proto.Position
-	6, // 7: proto.WorldState.players:type_name -> proto.PlayerState
-	7, // 8: proto.WorldState.bullets:type_name -> proto.BulletState
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	0,  // 0: proto.MoveAction.dir:type_name -> proto.Direction
+	5,  // 1: proto.ShootAction.target:type_name -> proto.Position
+	1,  // 2: proto.PlayerAction.move:type_name -> proto.MoveAction
+	2,  // 3: proto.PlayerAction.shoot:type_name -> proto.ShootAction
+	3,  // 4: proto.PlayerInput.player_actions:type_name -> proto.PlayerAction
+	5,  // 5: proto.PlayerState.pos:type_name -> proto.Position
+	5,  // 6: proto.BulletState.pos:type_name -> proto.Position
+	6,  // 7: proto.WorldState.players:type_name -> proto.PlayerState
+	7,  // 8: proto.WorldState.bullets:type_name -> proto.BulletState
+	8,  // 9: proto.GameMessage.world:type_name -> proto.WorldState
+	4,  // 10: proto.GameMessage.player_input:type_name -> proto.PlayerInput
+	9,  // 11: proto.GameMessage.connect_request:type_name -> proto.ConnectRequest
+	10, // 12: proto.GameMessage.connect_ack:type_name -> proto.ConnectAck
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_core_protobuf_proto_src_game_proto_init() }
@@ -586,13 +807,19 @@ func file_core_protobuf_proto_src_game_proto_init() {
 		(*PlayerAction_Move)(nil),
 		(*PlayerAction_Shoot)(nil),
 	}
+	file_core_protobuf_proto_src_game_proto_msgTypes[10].OneofWrappers = []any{
+		(*GameMessage_World)(nil),
+		(*GameMessage_PlayerInput)(nil),
+		(*GameMessage_ConnectRequest)(nil),
+		(*GameMessage_ConnectAck)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_protobuf_proto_src_game_proto_rawDesc), len(file_core_protobuf_proto_src_game_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

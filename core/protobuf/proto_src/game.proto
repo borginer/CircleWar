@@ -51,3 +51,20 @@ message WorldState {
   repeated PlayerState players = 1;
   repeated BulletState bullets = 2;
 }
+
+message ConnectRequest {
+  string game_name = 1;
+}
+
+message ConnectAck {
+  uint32 player_id = 1;
+}
+
+message GameMessage {
+  oneof payload {
+    WorldState     world           = 1;
+    PlayerInput    player_input    = 2;
+    ConnectRequest connect_request = 3;
+    ConnectAck     connect_ack     = 4;
+  }
+}

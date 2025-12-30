@@ -3,8 +3,8 @@ package config
 const ServerIP = "127.0.0.1"
 const Port = 4000
 
-const WorldWidth = 1920
-const WorldHeight = 1080
+const WorldWidth = 1020
+const WorldHeight = 680
 
 const BulletSpeed = 1800
 const PlayerSpeed = 1100

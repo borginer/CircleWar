@@ -32,7 +32,7 @@ func addPlayerShootAction(pi *protobuf.PlayerInput, target geom.Vector2) {
 
 func drawWorld(world *protobuf.WorldState) {
 	for _, player := range world.Players {
-		fmt.Println("player health:", player.Health, "size:", hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)))
+		// fmt.Println("player health:", player.Health, "size:", hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)))
 		rl.DrawCircle(
 			int32(player.Pos.X),
 			int32(player.Pos.Y),
@@ -42,7 +42,7 @@ func drawWorld(world *protobuf.WorldState) {
 	}
 
 	for _, bullet := range world.Bullets {
-		fmt.Println("bullet size:", bullet.Size)
+		// fmt.Println("bullet size:", bullet.Size)
 		rl.DrawCircle(
 			int32(bullet.Pos.X),
 			int32(bullet.Pos.Y),
@@ -107,7 +107,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	conn.Write([]byte{})
 
 	rl.InitWindow(config.WorldWidth, config.WorldHeight, "CircleWar Client")
 	defer rl.CloseWindow()
@@ -117,10 +116,26 @@ func main() {
 	serverInput := make(chan *protobuf.WorldState)
 	go serverInputHandler(conn, serverInput)
 
+	data, err := proto.Marshal(&protobuf.GameMessage{
+		Payload: &protobuf.GameMessage_ConnectRequest{
+			ConnectRequest: &protobuf.ConnectRequest{
+				GameName: "default",
+			},
+		},
+	})
+	conn.Write(data)
+
 	for !rl.WindowShouldClose() {
 		playerInput := getPlayerInput()
+		inputMsg := &protobuf.GameMessage{
+			Payload: &protobuf.GameMessage_PlayerInput{
+				PlayerInput: playerInput,
+			},
+		}
+
 		if len(playerInput.PlayerActions) > 0 {
-			data, err := proto.Marshal(playerInput)
+			data, err := proto.Marshal(inputMsg)
+			fmt.Println("player input:", playerInput)
 			if err != nil {
 				log.Fatal(err)
 			}
