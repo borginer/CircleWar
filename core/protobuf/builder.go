@@ -26,17 +26,19 @@ func BuildPlayerShootAction(target geom.Vector2) PlayerAction {
 	}}
 }
 
-func BuildPlayerState(pos geom.Vector2, health sharedtypes.PlayerHealth) PlayerState {
+func BuildPlayerState(pos geom.Vector2, health sharedtypes.PlayerHealth, playerId uint32) PlayerState {
 	return PlayerState{
-		Pos:    &Position{X: pos.X, Y: pos.Y},
-		Health: uint32(health),
+		Pos:      &Position{X: pos.X, Y: pos.Y},
+		Health:   uint32(health),
+		PlayerId: playerId,
 	}
 }
 
-func BuildBulletState(pos geom.Vector2, size float32) BulletState {
+func BuildBulletState(pos geom.Vector2, size float32, ownerId uint32) BulletState {
 	return BulletState{
-		Pos:  &Position{X: pos.X, Y: pos.Y},
-		Size: size,
+		Pos:     &Position{X: pos.X, Y: pos.Y},
+		Size:    size,
+		OwnerId: ownerId,
 	}
 }
 

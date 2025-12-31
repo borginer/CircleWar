@@ -42,20 +42,20 @@ func NewPlayerState(pos geom.Vector2, addr stypes.UDPAddrStr) PlayerState {
 // }
 
 type BulletState struct {
-	PlayerId uint
-	Born     time.Time
-	Pos      geom.Vector2
-	MoveDir  geom.Direction
-	Size     float32
+	OwnerId uint
+	Born    time.Time
+	Pos     geom.Vector2
+	MoveDir geom.Direction
+	Size    float32
 }
 
 func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
 	return BulletState{
-		PlayerId: player.Id,
-		Born:     time.Now(),
-		Pos:      player.Pos,
-		MoveDir:  geom.NewDir(target.Sub(player.Pos)),
-		Size:     hitboxes.BulletSize(player.Health()),
+		OwnerId: player.Id,
+		Born:    time.Now(),
+		Pos:     player.Pos,
+		MoveDir: geom.NewDir(target.Sub(player.Pos)),
+		Size:    hitboxes.BulletSize(player.Health()),
 	}
 }
 
@@ -69,11 +69,13 @@ type ServerWorld struct {
 	bullets       map[int]*BulletState
 	addresses     map[stypes.UDPAddrStr]bool
 	height, width float32
+	tickNum       uint32
 }
 
 func NewServerWorld() ServerWorld {
 	return ServerWorld{
 		nextBulletId: 0,
+		tickNum:      0,
 		players:      make(map[uint]PlayerState),
 		bullets:      make(map[int]*BulletState),
 		addresses:    make(map[stypes.UDPAddrStr]bool),
@@ -88,6 +90,14 @@ func (sw *ServerWorld) Width() float32 {
 
 func (sw *ServerWorld) Height() float32 {
 	return sw.height
+}
+
+func (sw *ServerWorld) IncTick() {
+	sw.tickNum++
+}
+
+func (sw *ServerWorld) Tick() uint32 {
+	return sw.tickNum
 }
 
 func (sw *ServerWorld) AddAddress(addr stypes.UDPAddrStr) {

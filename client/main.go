@@ -5,10 +5,12 @@ import (
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
 	"CircleWar/core/protobuf"
-	sharedtypes "CircleWar/core/types"
+	stypes "CircleWar/core/types"
 	"fmt"
 	"log"
 	"net"
+	"strconv"
+
 	// "time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -30,24 +32,35 @@ func addPlayerShootAction(pi *protobuf.PlayerInput, target geom.Vector2) {
 	pi.PlayerActions = append(pi.PlayerActions, &shootAction)
 }
 
-func drawWorld(world *protobuf.WorldState) {
+func drawWorld(world *protobuf.WorldState, myId uint32) {
+	var color rl.Color
 	for _, player := range world.Players {
 		// fmt.Println("player health:", player.Health, "size:", hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)))
+		if player.PlayerId == myId {
+			color = rl.Blue
+		} else {
+			color = rl.Red
+		}
 		rl.DrawCircle(
 			int32(player.Pos.X),
 			int32(player.Pos.Y),
-			hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)),
-			rl.Blue,
+			hitboxes.PlayerSize(stypes.PlayerHealth(player.Health)),
+			color,
 		)
 	}
 
 	for _, bullet := range world.Bullets {
 		// fmt.Println("bullet size:", bullet.Size)
+		if bullet.OwnerId == myId {
+			color = rl.Blue
+		} else {
+			color = rl.Red
+		}
 		rl.DrawCircle(
 			int32(bullet.Pos.X),
 			int32(bullet.Pos.Y),
 			bullet.Size,
-			rl.Blue,
+			color,
 		)
 	}
 }
@@ -87,7 +100,7 @@ func serverInputHandler(conn *net.UDPConn, serverInput chan *protobuf.GameMessag
 		if err != nil {
 			continue
 		}
-		// fmt.Println("bytes from udp:", n)
+		fmt.Println("bytes from udp:", n)
 		err = proto.Unmarshal(buf[:n], servMsg)
 		if err != nil {
 			continue
@@ -97,6 +110,15 @@ func serverInputHandler(conn *net.UDPConn, serverInput chan *protobuf.GameMessag
 		serverInput <- servMsg
 		servMsg = &protobuf.GameMessage{}
 	}
+}
+
+func getMyHealth(ws *protobuf.WorldState, myId uint32) uint32 {
+	for _, player := range ws.Players {
+		if player.PlayerId == myId {
+			return player.Health
+		}
+	}
+	return 0
 }
 
 func main() {
@@ -111,7 +133,6 @@ func main() {
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(100)
 
-	world := &protobuf.WorldState{}
 	serverMsg := make(chan *protobuf.GameMessage)
 	go serverInputHandler(conn, serverMsg)
 
@@ -122,9 +143,12 @@ func main() {
 			},
 		},
 	})
+
 	conn.Write(data)
 
+	curWorld := &protobuf.WorldState{}
 	var playerId uint32
+	var lastServerTick uint32 = 0
 
 	for !rl.WindowShouldClose() {
 		playerInput := getPlayerInput()
@@ -146,16 +170,23 @@ func main() {
 		case msg := <-serverMsg:
 			switch payload := msg.Payload.(type) {
 			case *protobuf.GameMessage_World:
-				world = payload.World
+				fmt.Println("tick num:", curWorld.TickNum, "last tick:", lastServerTick)
+				if payload.World.TickNum >= lastServerTick {
+					lastServerTick = payload.World.TickNum
+					curWorld = payload.World
+				}
 			case *protobuf.GameMessage_ConnectAck:
 				playerId = payload.ConnectAck.PlayerId
 			}
 		default:
 		}
 
+		myHealth := getMyHealth(curWorld, playerId)
+
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
-		drawWorld(world)
+		rl.DrawText("HP : "+strconv.FormatInt(int64(myHealth), 10), 10, 10, 36, rl.Black)
+		drawWorld(curWorld, playerId)
 		rl.EndDrawing()
 	}
 }

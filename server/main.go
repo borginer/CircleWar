@@ -166,9 +166,9 @@ func clientInputHandler(conn *net.UDPConn, inputChan chan ClientMsg) {
 
 		switch payload := gameMsg.Payload.(type) {
 		case *protobuf.GameMessage_PlayerInput:
-			fmt.Println("player input:", payload)
+			// fmt.Println("player input:", payload)
 			playerIn := extractPlayerInput(payload.PlayerInput)
-			fmt.Println("player in:", playerIn)
+			// fmt.Println("player in:", playerIn)
 			inputChan <- playerIn
 		case *protobuf.GameMessage_ConnectRequest:
 			joinReq := payload.ConnectRequest
@@ -183,7 +183,7 @@ func clientInputHandler(conn *net.UDPConn, inputChan chan ClientMsg) {
 func calculateHits(serverWorld *worldstate.ServerWorld) {
 	for _, player := range serverWorld.PlayerSnapshots() {
 		for bulletId, bullet := range serverWorld.BulletSnapshots() {
-			if bullet.PlayerId == player.Id {
+			if bullet.OwnerId == player.Id {
 				continue
 			}
 			playerRad := hitboxes.PlayerSize(player.Health())
@@ -221,7 +221,7 @@ func movePlayer(serverWorld *worldstate.ServerWorld, id uint, delta geom.Vector2
 func handleClientInputs(serverWorld *worldstate.ServerWorld, clientInput *playerInput) {
 	dirMap := make(map[moveDirection]bool)
 	for _, action := range clientInput.actions {
-		fmt.Println("player id:", clientInput.id)
+		// fmt.Println("player id:", clientInput.id)
 		switch act := action.(type) {
 		case moveAction:
 			dirMap[act.dir] = true
@@ -268,12 +268,12 @@ func buildPBWorldState(serverWorld *worldstate.ServerWorld) *protobuf.WorldState
 
 	players := serverWorld.PlayerSnapshots()
 	for _, player := range players {
-		pbPlayer := protobuf.BuildPlayerState(player.Pos, player.Health())
+		pbPlayer := protobuf.BuildPlayerState(player.Pos, player.Health(), uint32(player.Id))
 		pbWorld.Players = append(pbWorld.Players, &pbPlayer)
 	}
 
 	for _, bullet := range serverWorld.BulletSnapshots() {
-		pbBullet := protobuf.BuildBulletState(bullet.Pos, bullet.Size)
+		pbBullet := protobuf.BuildBulletState(bullet.Pos, bullet.Size, uint32(bullet.OwnerId))
 		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
 	}
 
@@ -291,6 +291,18 @@ func openUDPConn() *net.UDPConn {
 		log.Fatal(err)
 	}
 	return conn
+}
+
+func sendMessagesToClients(sw worldstate.ServerWorld, conn *net.UDPConn, data []byte) {
+	// fmt.Println("tick num:", sw.Tick())
+	// ms := rand.Intn(10) + 35
+	// fmt.Println("ms:", ms)
+	// time.Sleep(time.Duration(ms) * time.Millisecond)
+	// fmt.Printf("data size: %d\n", len(data))
+	for _, addr := range sw.AddressSnapshots() {
+		netAddr, _ := net.ResolveUDPAddr("udp", string(addr))
+		conn.WriteToUDP(data, netAddr)
+	}
 }
 
 func main() {
@@ -314,21 +326,20 @@ func main() {
 			playerInputs = make(map[uint]playerInput)
 
 			pbWorld := buildPBWorldState(&serverWorld)
+			(&serverWorld).IncTick()
+			pbWorld.TickNum = serverWorld.Tick()
 			// if len(pbWorld.Players) > 0 {
 			// 	fmt.Println("player health: ", pbWorld.Players[0].Health)
 			// }
 			worldMsg := protobuf.BuildGameMessage(&protobuf.GameMessage_World{
 				World: pbWorld,
 			})
+			fmt.Println("game message:", worldMsg)
 			data, err := proto.Marshal(worldMsg)
 			if err != nil {
 				log.Fatal(err)
 			}
-			// fmt.Printf("data size: %d\n", len(data))
-			for _, addr := range serverWorld.AddressSnapshots() {
-				netAddr, _ := net.ResolveUDPAddr("udp", string(addr))
-				conn.WriteToUDP(data, netAddr)
-			}
+			go sendMessagesToClients(serverWorld, conn, data)
 
 		case input := <-inputChan:
 			switch in := input.(type) {

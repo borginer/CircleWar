@@ -39,18 +39,21 @@ message Position {
 }
 
 message PlayerState {
-  Position pos    = 1;
-  uint32   health = 2;
+  Position pos       = 1;
+  uint32   health    = 2;
+  uint32   player_id = 3;
 }
 
 message BulletState {
-  Position pos  = 1;
-  float    size = 2;
+  Position pos      = 1;
+  float    size     = 2;
+  uint32   owner_id = 3;
 }
 
 message WorldState {
-  repeated PlayerState players = 1;
-  repeated BulletState bullets = 2;
+  uint32               tick_num = 1;
+  repeated PlayerState players  = 2;
+  repeated BulletState bullets  = 3;
 }
 
 message ConnectRequest {
