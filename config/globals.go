@@ -12,8 +12,10 @@ const PlayerSpeed = 1100
 const BulletTimeToLiveSec = 1.5
 const BulletCooldownMS = 180
 
+// players and bullets shrink as the player losses hp
 const InitialPlayerHealth = 20
 const InitialPlayerSize = 48
 const PlayerShrinkStep = 1
+
 const InitialBulletSize = 20
 const BulletShrinkStep = 0.5
