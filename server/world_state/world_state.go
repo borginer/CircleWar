@@ -65,7 +65,7 @@ func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
 
 type ServerWorld struct {
 	nextBulletId  int
-	players       map[string]PlayerState
+	players       map[uint]PlayerState
 	bullets       map[int]*BulletState
 	addresses     map[stypes.UDPAddrStr]bool
 	height, width float32
@@ -74,7 +74,7 @@ type ServerWorld struct {
 func NewServerWorld() ServerWorld {
 	return ServerWorld{
 		nextBulletId: 0,
-		players:      make(map[string]PlayerState),
+		players:      make(map[uint]PlayerState),
 		bullets:      make(map[int]*BulletState),
 		addresses:    make(map[stypes.UDPAddrStr]bool),
 		height:       config.WorldHeight,
@@ -102,15 +102,15 @@ func (sw *ServerWorld) AddressSnapshots() []stypes.UDPAddrStr {
 	return snapshot
 }
 
-func (sw *ServerWorld) StartPlayerBulletCD(addr stypes.UDPAddrStr) {
-	playerState := sw.players[string(addr)]
+func (sw *ServerWorld) StartPlayerBulletCD(id uint) {
+	playerState := sw.players[id]
 	playerState.LastBulletShot = time.Now()
-	sw.players[string(addr)] = playerState
+	sw.players[id] = playerState
 }
 
-func (sw *ServerWorld) DurSinceLastBullet(addr stypes.UDPAddrStr) time.Duration {
+func (sw *ServerWorld) DurSinceLastBullet(id uint) time.Duration {
 	now := time.Now()
-	return now.Sub(sw.players[string(addr)].LastBulletShot)
+	return now.Sub(sw.players[id].LastBulletShot)
 }
 
 func (sw *ServerWorld) PlayerSnapshots() []PlayerState {
@@ -121,25 +121,25 @@ func (sw *ServerWorld) PlayerSnapshots() []PlayerState {
 	return snapshot
 }
 
-func (sw *ServerWorld) AddPlayerState(key string, state PlayerState) {
-	sw.players[key] = state
+func (sw *ServerWorld) AddPlayerState(player PlayerState) {
+	sw.players[player.Id] = player
 }
 
-func (sw *ServerWorld) HasPlayer(key string) bool {
-	_, ok := sw.players[key]
+func (sw *ServerWorld) HasPlayer(id uint) bool {
+	_, ok := sw.players[id]
 	return ok
 }
 
-func (sw *ServerWorld) RemovePlayerState(key string) {
-	delete(sw.players, key)
+func (sw *ServerWorld) RemovePlayerState(id uint) {
+	delete(sw.players, id)
 }
 
-func (sw *ServerWorld) PlayerSnapshot(key string) PlayerState {
-	return sw.players[key]
+func (sw *ServerWorld) PlayerSnapshot(id uint) PlayerState {
+	return sw.players[id]
 }
 
-func (sw *ServerWorld) HasPlayerState(key string) bool {
-	_, ok := sw.players[key]
+func (sw *ServerWorld) HasPlayerState(id uint) bool {
+	_, ok := sw.players[id]
 	return ok
 }
 

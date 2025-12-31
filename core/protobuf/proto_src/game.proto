@@ -30,6 +30,7 @@ message PlayerAction {
 
 message PlayerInput {
   repeated PlayerAction player_actions = 1;
+  uint32                player_id      = 2;
 }
 
 message Position {

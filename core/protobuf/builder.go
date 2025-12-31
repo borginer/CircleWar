@@ -39,3 +39,15 @@ func BuildBulletState(pos geom.Vector2, size float32) BulletState {
 		Size: size,
 	}
 }
+
+func BuildConnectAckMsg(playerId uint) *GameMessage {
+	return BuildGameMessage(
+		&GameMessage_ConnectAck{&ConnectAck{PlayerId: uint32(playerId)}},
+	)
+}
+
+func BuildGameMessage(payload isGameMessage_Payload) *GameMessage {
+	return &GameMessage{
+		Payload: payload,
+	}
+}

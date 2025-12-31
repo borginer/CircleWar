@@ -8,8 +8,8 @@ func NewVector(x, y float32) Vector2 {
 	return Vector2{x, y}
 }
 
-func (v Vector2) Add(x, y float32) Vector2 {
-	return Vector2{v.X + x, v.Y + y}
+func (v Vector2) Add(other Vector2) Vector2 {
+	return NewVector(v.X+other.X, v.Y+other.Y)
 }
 
 func (v Vector2) Sub(other Vector2) Vector2 {
@@ -47,7 +47,7 @@ func (v Vector2) normalized() Vector2 {
 	if length == 0 {
 		return v // (0, 0)
 	}
-	return Vector2{v.X / float32(length), v.Y / float32(length)}
+	return NewVector(v.X/float32(length), v.Y/float32(length))
 }
 
 func (v Vector2) Coord() (float32, float32) {

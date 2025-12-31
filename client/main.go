@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"time"
+	// "time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"google.golang.org/protobuf/proto"
@@ -78,25 +78,24 @@ func getPlayerInput() *protobuf.PlayerInput {
 	return playerInput
 }
 
-func serverInputHandler(conn *net.UDPConn, serverInput chan *protobuf.WorldState) {
+func serverInputHandler(conn *net.UDPConn, serverInput chan *protobuf.GameMessage) {
 	buf := make([]byte, 1024)
 	i := 0
-	world := &protobuf.WorldState{}
+	servMsg := &protobuf.GameMessage{}
 	for {
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			continue
 		}
-		fmt.Println("bytes from udp:", n)
-		err = proto.Unmarshal(buf[:n], world)
+		// fmt.Println("bytes from udp:", n)
+		err = proto.Unmarshal(buf[:n], servMsg)
 		if err != nil {
 			continue
 		}
 		i++
-		fmt.Printf("server update number %d at time: %s\n", i, time.Now().String())
-		serverInput <- world
-		world = &protobuf.WorldState{}
-
+		// fmt.Printf("server update number %d at time: %s\n", i, time.Now().String())
+		serverInput <- servMsg
+		servMsg = &protobuf.GameMessage{}
 	}
 }
 
@@ -113,8 +112,8 @@ func main() {
 	rl.SetTargetFPS(100)
 
 	world := &protobuf.WorldState{}
-	serverInput := make(chan *protobuf.WorldState)
-	go serverInputHandler(conn, serverInput)
+	serverMsg := make(chan *protobuf.GameMessage)
+	go serverInputHandler(conn, serverMsg)
 
 	data, err := proto.Marshal(&protobuf.GameMessage{
 		Payload: &protobuf.GameMessage_ConnectRequest{
@@ -125,17 +124,18 @@ func main() {
 	})
 	conn.Write(data)
 
+	var playerId uint32
+
 	for !rl.WindowShouldClose() {
 		playerInput := getPlayerInput()
-		inputMsg := &protobuf.GameMessage{
-			Payload: &protobuf.GameMessage_PlayerInput{
-				PlayerInput: playerInput,
-			},
-		}
+		playerInput.PlayerId = playerId
+		inputMsg := protobuf.BuildGameMessage(&protobuf.GameMessage_PlayerInput{
+			PlayerInput: playerInput,
+		})
 
 		if len(playerInput.PlayerActions) > 0 {
 			data, err := proto.Marshal(inputMsg)
-			fmt.Println("player input:", playerInput)
+			// fmt.Println("player input:", playerInput)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -143,8 +143,13 @@ func main() {
 		}
 
 		select {
-		case newWorld := <-serverInput:
-			world = newWorld
+		case msg := <-serverMsg:
+			switch payload := msg.Payload.(type) {
+			case *protobuf.GameMessage_World:
+				world = payload.World
+			case *protobuf.GameMessage_ConnectAck:
+				playerId = payload.ConnectAck.PlayerId
+			}
 		default:
 		}
 

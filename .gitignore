@@ -1,1 +1,2 @@
 bin/*
+core/protobuf/game.pb.go
