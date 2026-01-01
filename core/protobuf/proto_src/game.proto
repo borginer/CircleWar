@@ -64,11 +64,21 @@ message ConnectAck {
   uint32 player_id = 1;
 }
 
+message DeathNote {
+  uint32 player_id = 1;
+}
+
+message ReconnectRequest {
+  uint32 old_player_id = 1;
+}
+
 message GameMessage {
   oneof payload {
-    WorldState     world           = 1;
-    PlayerInput    player_input    = 2;
-    ConnectRequest connect_request = 3;
-    ConnectAck     connect_ack     = 4;
+    WorldState       world             = 1;
+    PlayerInput      player_input      = 2;
+    ConnectRequest   connect_request   = 3;
+    ReconnectRequest reconnect_request = 4;
+    ConnectAck       connect_ack       = 5;
+    DeathNote        death_note        = 6;
   }
 }

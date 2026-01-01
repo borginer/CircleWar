@@ -3,6 +3,7 @@ module CircleWar
 go 1.24.3
 
 require (
+	github.com/gen2brain/raylib-go/raygui v0.0.0-20251228111424-040fd2b41803
 	github.com/gen2brain/raylib-go/raylib v0.55.1
 	google.golang.org/protobuf v1.36.11
 )

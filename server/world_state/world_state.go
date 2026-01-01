@@ -67,7 +67,7 @@ type ServerWorld struct {
 	nextBulletId  int
 	players       map[uint]PlayerState
 	bullets       map[int]*BulletState
-	addresses     map[stypes.UDPAddrStr]bool
+	addresses     map[uint]stypes.UDPAddrStr
 	height, width float32
 	tickNum       uint32
 }
@@ -78,7 +78,7 @@ func NewServerWorld() ServerWorld {
 		tickNum:      0,
 		players:      make(map[uint]PlayerState),
 		bullets:      make(map[int]*BulletState),
-		addresses:    make(map[stypes.UDPAddrStr]bool),
+		addresses:    make(map[uint]stypes.UDPAddrStr),
 		height:       config.WorldHeight,
 		width:        config.WorldWidth,
 	}
@@ -100,16 +100,20 @@ func (sw *ServerWorld) Tick() uint32 {
 	return sw.tickNum
 }
 
-func (sw *ServerWorld) AddAddress(addr stypes.UDPAddrStr) {
-	sw.addresses[addr] = true
+func (sw *ServerWorld) AddAddress(playerId uint, addr stypes.UDPAddrStr) {
+	sw.addresses[playerId] = addr
 }
 
-func (sw *ServerWorld) AddressSnapshots() []stypes.UDPAddrStr {
-	snapshot := []stypes.UDPAddrStr{}
-	for addr := range sw.addresses {
-		snapshot = append(snapshot, addr)
-	}
-	return snapshot
+func (sw *ServerWorld) AddressSnapshots() map[uint]stypes.UDPAddrStr {
+	return sw.addresses
+}
+
+func (sw *ServerWorld) GetAddress(playerId uint) stypes.UDPAddrStr {
+	return sw.addresses[playerId]
+}
+
+func (sw *ServerWorld) RemovePlayerAddress(playerId uint) {
+	delete(sw.addresses, playerId)
 }
 
 func (sw *ServerWorld) StartPlayerBulletCD(id uint) {

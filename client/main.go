@@ -4,17 +4,16 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
-	"CircleWar/core/protobuf"
+	pb "CircleWar/core/protobuf"
 	stypes "CircleWar/core/types"
+	"errors"
 	"fmt"
+	gui "github.com/gen2brain/raylib-go/raygui"
+	rl "github.com/gen2brain/raylib-go/raylib"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
 	"strconv"
-
-	// "time"
-
-	rl "github.com/gen2brain/raylib-go/raylib"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -22,17 +21,17 @@ const (
 	serverIP = config.ServerIP
 )
 
-func addPlayerDirAction(pi *protobuf.PlayerInput, dir protobuf.Direction) {
-	moveAction := protobuf.BuildPlayerMoveAction(dir)
+func addPlayerDirAction(pi *pb.PlayerInput, dir pb.Direction) {
+	moveAction := pb.BuildPlayerMoveAction(dir)
 	pi.PlayerActions = append(pi.PlayerActions, &moveAction)
 }
 
-func addPlayerShootAction(pi *protobuf.PlayerInput, target geom.Vector2) {
-	shootAction := protobuf.BuildPlayerShootAction(target)
+func addPlayerShootAction(pi *pb.PlayerInput, target geom.Vector2) {
+	shootAction := pb.BuildPlayerShootAction(target)
 	pi.PlayerActions = append(pi.PlayerActions, &shootAction)
 }
 
-func drawWorld(world *protobuf.WorldState, myId uint32) {
+func drawWorld(world *pb.WorldState, myId uint32) {
 	var color rl.Color
 	for _, player := range world.Players {
 		// fmt.Println("player health:", player.Health, "size:", hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)))
@@ -65,21 +64,21 @@ func drawWorld(world *protobuf.WorldState, myId uint32) {
 	}
 }
 
-func getPlayerInput() *protobuf.PlayerInput {
-	playerInput := &protobuf.PlayerInput{}
+func getPlayerInput() *pb.PlayerInput {
+	playerInput := &pb.PlayerInput{}
 
 	// ### WASD ###
 	if rl.IsKeyDown(rl.KeyW) {
-		addPlayerDirAction(playerInput, protobuf.Direction_UP)
+		addPlayerDirAction(playerInput, pb.Direction_UP)
 	}
 	if rl.IsKeyDown(rl.KeyS) {
-		addPlayerDirAction(playerInput, protobuf.Direction_DOWN)
+		addPlayerDirAction(playerInput, pb.Direction_DOWN)
 	}
 	if rl.IsKeyDown(rl.KeyA) {
-		addPlayerDirAction(playerInput, protobuf.Direction_LEFT)
+		addPlayerDirAction(playerInput, pb.Direction_LEFT)
 	}
 	if rl.IsKeyDown(rl.KeyD) {
-		addPlayerDirAction(playerInput, protobuf.Direction_RIGHT)
+		addPlayerDirAction(playerInput, pb.Direction_RIGHT)
 	}
 
 	// ### Shoot with mouse ###
@@ -91,35 +90,45 @@ func getPlayerInput() *protobuf.PlayerInput {
 	return playerInput
 }
 
-func serverInputHandler(conn *net.UDPConn, serverInput chan *protobuf.GameMessage) {
+func serverInputHandler(conn *net.UDPConn, serverInput chan *pb.GameMessage) {
 	buf := make([]byte, 1024)
 	i := 0
-	servMsg := &protobuf.GameMessage{}
+	servMsg := &pb.GameMessage{}
 	for {
-		n, _, err := conn.ReadFromUDP(buf)
+		n, addr, err := conn.ReadFromUDP(buf)
 		if err != nil {
+			fmt.Println("read err:", err)
 			continue
 		}
-		fmt.Println("bytes from udp:", n)
+		fmt.Println("bytes from udp:", n, "addr:", addr)
 		err = proto.Unmarshal(buf[:n], servMsg)
 		if err != nil {
+			fmt.Println("unmarshal err:", err)
 			continue
 		}
 		i++
 		// fmt.Printf("server update number %d at time: %s\n", i, time.Now().String())
 		serverInput <- servMsg
-		servMsg = &protobuf.GameMessage{}
+		servMsg = &pb.GameMessage{}
 	}
 }
 
-func getMyHealth(ws *protobuf.WorldState, myId uint32) uint32 {
+func getMyHealth(ws *pb.WorldState, myId uint32) (uint32, error) {
 	for _, player := range ws.Players {
 		if player.PlayerId == myId {
-			return player.Health
+			return player.Health, nil
 		}
 	}
-	return 0
+	return 0, errors.New("player not found in world")
 }
+
+type Status uint
+
+const (
+	NONE = iota
+	ALIVE
+	DEAD
+)
 
 func main() {
 	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", serverIP, port))
@@ -133,59 +142,88 @@ func main() {
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(100)
 
-	serverMsg := make(chan *protobuf.GameMessage)
+	serverMsg := make(chan *pb.GameMessage)
 	go serverInputHandler(conn, serverMsg)
 
-	data, err := proto.Marshal(&protobuf.GameMessage{
-		Payload: &protobuf.GameMessage_ConnectRequest{
-			ConnectRequest: &protobuf.ConnectRequest{
+	curWorld := &pb.WorldState{}
+	var playerId uint32
+	var lastServerTick uint32 = 0
+	status := NONE
+
+	// send connect
+	data, err := proto.Marshal(&pb.GameMessage{
+		Payload: &pb.GameMessage_ConnectRequest{
+			ConnectRequest: &pb.ConnectRequest{
 				GameName: "default",
 			},
 		},
 	})
-
+	if err != nil {
+		fmt.Println("fuck")
+	}
 	conn.Write(data)
 
-	curWorld := &protobuf.WorldState{}
-	var playerId uint32
-	var lastServerTick uint32 = 0
-
 	for !rl.WindowShouldClose() {
-		playerInput := getPlayerInput()
-		playerInput.PlayerId = playerId
-		inputMsg := protobuf.BuildGameMessage(&protobuf.GameMessage_PlayerInput{
-			PlayerInput: playerInput,
-		})
+		if status == ALIVE {
+			playerInput := getPlayerInput()
+			playerInput.PlayerId = playerId
+			inputMsg := pb.BuildGameMessage(&pb.GameMessage_PlayerInput{
+				PlayerInput: playerInput,
+			})
 
-		if len(playerInput.PlayerActions) > 0 {
-			data, err := proto.Marshal(inputMsg)
-			// fmt.Println("player input:", playerInput)
-			if err != nil {
-				log.Fatal(err)
+			if len(playerInput.PlayerActions) > 0 {
+				data, err := proto.Marshal(inputMsg)
+				if err != nil {
+					log.Fatal(err)
+				}
+				conn.Write(data)
 			}
-			conn.Write(data)
 		}
 
 		select {
 		case msg := <-serverMsg:
+			fmt.Println("msg:", msg)
 			switch payload := msg.Payload.(type) {
-			case *protobuf.GameMessage_World:
+			case *pb.GameMessage_World:
 				fmt.Println("tick num:", curWorld.TickNum, "last tick:", lastServerTick)
 				if payload.World.TickNum >= lastServerTick {
 					lastServerTick = payload.World.TickNum
 					curWorld = payload.World
 				}
-			case *protobuf.GameMessage_ConnectAck:
+			case *pb.GameMessage_ConnectAck:
 				playerId = payload.ConnectAck.PlayerId
+				status = ALIVE
+			case *pb.GameMessage_DeathNote:
+				status = DEAD
 			}
 		default:
 		}
 
-		myHealth := getMyHealth(curWorld, playerId)
+		if status == DEAD {
+			bx, by := float32(180), float32(60)
+			if gui.Button(rl.Rectangle{
+				X: (config.CameraWidth - bx) / 2, Y: (config.CameraHeight - by) / 2,
+				Width: bx, Height: by,
+			}, "Reconnect") {
+				data, err := proto.Marshal(&pb.GameMessage{
+					Payload: &pb.GameMessage_ReconnectRequest{
+						ReconnectRequest: &pb.ReconnectRequest{
+							OldPlayerId: playerId,
+						},
+					},
+				})
+				if err != nil {
+					fmt.Println("fuck")
+				}
+				conn.Write(data)
+				status = NONE
+			}
+		}
+		myHealth, _ := getMyHealth(curWorld, playerId)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
-		rl.DrawText("HP : "+strconv.FormatInt(int64(myHealth), 10), 10, 10, 36, rl.Black)
+		rl.DrawText("HP : "+strconv.FormatInt(int64(myHealth), 10), 10, 10, 32, rl.Black)
 		drawWorld(curWorld, playerId)
 		rl.EndDrawing()
 	}

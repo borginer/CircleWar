@@ -5,6 +5,8 @@ const Port = 4000
 
 const WorldWidth = 1020
 const WorldHeight = 680
+const CameraWidth = 1020
+const CameraHeight = 680
 
 const BulletSpeed = 1800
 const PlayerSpeed = 1100

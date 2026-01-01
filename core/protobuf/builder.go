@@ -48,6 +48,12 @@ func BuildConnectAckMsg(playerId uint) *GameMessage {
 	)
 }
 
+func BuildDeathNote(playerId uint) *GameMessage {
+	return BuildGameMessage(
+		&GameMessage_DeathNote{&DeathNote{PlayerId: uint32(playerId)}},
+	)
+}
+
 func BuildGameMessage(payload isGameMessage_Payload) *GameMessage {
 	return &GameMessage{
 		Payload: payload,
