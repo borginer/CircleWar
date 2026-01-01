@@ -78,7 +78,7 @@ type ClientMsg interface {
 // }
 
 type clientJoinReq struct {
-	addrStr  stypes.UDPAddrStr
+	addr  stypes.UDPAddrStr
 	gameName string
 }
 
@@ -173,7 +173,7 @@ func clientInputHandler(conn *net.UDPConn, inputChan chan ClientMsg) {
 		case *protobuf.GameMessage_ConnectRequest:
 			joinReq := payload.ConnectRequest
 			inputChan <- &clientJoinReq{
-				addrStr:  clientAddrStr,
+				addr:  clientAddrStr,
 				gameName: joinReq.GameName,
 			}
 		}
@@ -277,6 +277,8 @@ func buildPBWorldState(serverWorld *worldstate.ServerWorld) *protobuf.WorldState
 		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
 	}
 
+	pbWorld.TickNum = serverWorld.Tick()
+
 	return pbWorld
 }
 
@@ -293,7 +295,16 @@ func openUDPConn() *net.UDPConn {
 	return conn
 }
 
-func sendMessagesToClients(sw worldstate.ServerWorld, conn *net.UDPConn, data []byte) {
+func sendWorldToClients(sw worldstate.ServerWorld, conn *net.UDPConn, pbWorld *protobuf.WorldState) {
+	worldMsg := protobuf.BuildGameMessage(&protobuf.GameMessage_World{
+		World: pbWorld,
+	})
+	fmt.Println("game message:", worldMsg)
+	data, err := proto.Marshal(worldMsg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// fmt.Println("tick num:", sw.Tick())
 	// ms := rand.Intn(10) + 35
 	// fmt.Println("ms:", ms)
@@ -305,6 +316,35 @@ func sendMessagesToClients(sw worldstate.ServerWorld, conn *net.UDPConn, data []
 	}
 }
 
+func handleWorldTick(sw *worldstate.ServerWorld, playerInputs map[uint]playerInput) *protobuf.WorldState {
+	updateWorldState(sw, playerInputs)
+	pbWorld := buildPBWorldState(sw)
+	(sw).IncTick()
+	return pbWorld
+}
+
+func handlePlayerConnect(sw *worldstate.ServerWorld, req *clientJoinReq) *protobuf.GameMessage {
+	sw.AddAddress(req.addr)
+	// TODO: add udp addr to player id mapping to check if player is reconnecting
+	// instead of always creating new player
+	newPlayer := worldstate.NewPlayerState(geom.NewVector(500, 500), req.addr)
+	fmt.Println("new player:", newPlayer)
+	sw.AddPlayerState(newPlayer)
+	return protobuf.BuildConnectAckMsg(newPlayer.Id)
+
+}
+
+func sendConnectAck(conn *net.UDPConn, ack *protobuf.GameMessage, clientAddr stypes.UDPAddrStr) {
+	data, err := proto.Marshal(ack)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("player addr:", clientAddr)
+	netAddr, _ := net.ResolveUDPAddr("udp", string(clientAddr))
+	conn.WriteToUDP(data, netAddr)
+
+}
+
 func main() {
 	conn := openUDPConn()
 	defer conn.Close()
@@ -312,56 +352,25 @@ func main() {
 
 	serverWorld := worldstate.NewServerWorld()
 	clock := time.Tick(time.Second / ticksPerSecond)
+	playerInputs := make(map[uint]playerInput)
 
 	inputChan := make(chan ClientMsg)
 	go clientInputHandler(conn, inputChan)
 
-	playerInputs := make(map[uint]playerInput)
 	for {
 		select {
 		case <-clock:
 			// fmt.Println(tick)
-
-			updateWorldState(&serverWorld, playerInputs)
-			playerInputs = make(map[uint]playerInput)
-
-			pbWorld := buildPBWorldState(&serverWorld)
-			(&serverWorld).IncTick()
-			pbWorld.TickNum = serverWorld.Tick()
-			// if len(pbWorld.Players) > 0 {
-			// 	fmt.Println("player health: ", pbWorld.Players[0].Health)
-			// }
-			worldMsg := protobuf.BuildGameMessage(&protobuf.GameMessage_World{
-				World: pbWorld,
-			})
-			fmt.Println("game message:", worldMsg)
-			data, err := proto.Marshal(worldMsg)
-			if err != nil {
-				log.Fatal(err)
-			}
-			go sendMessagesToClients(serverWorld, conn, data)
-
+			pbWorld := handleWorldTick(&serverWorld, playerInputs)
+			go sendWorldToClients(serverWorld, conn, pbWorld)
+			playerInputs = make(map[uint]playerInput) // reset inputs for next tick
 		case input := <-inputChan:
 			switch in := input.(type) {
 			case *playerInput:
 				playerInputs[in.id] = *in
 			case *clientJoinReq:
-				serverWorld.AddAddress(in.addrStr)
-				// if !serverWorld.HasPlayerState(in.Id) {
-				// TODO: add udp addr to player id mapping to check if player is reconnecting
-				// instead of always creating new player
-				// }
-				newPlayer := worldstate.NewPlayerState(geom.NewVector(500, 500), in.addrStr)
-				fmt.Println("new player:", newPlayer)
-				serverWorld.AddPlayerState(newPlayer)
-				connectMsg := protobuf.BuildConnectAckMsg(newPlayer.Id)
-				data, err := proto.Marshal(connectMsg)
-				if err != nil {
-					log.Fatal(err)
-				}
-				fmt.Println("player addr:", in.addrStr)
-				netAddr, _ := net.ResolveUDPAddr("udp", string(in.addrStr))
-				conn.WriteToUDP(data, netAddr)
+				ackMsg := handlePlayerConnect(&serverWorld, in)
+				sendConnectAck(conn, ackMsg, in.addr)
 			default:
 				fmt.Println("player input didn't match any case", input)
 			}
