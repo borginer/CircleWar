@@ -4,8 +4,8 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
-	pb "CircleWar/core/network/protobuf"
-	stypes "CircleWar/core/types"
+	"CircleWar/core/network/gameConn"
+	stypes "CircleWar/core/stypes"
 	wstate "CircleWar/server/world_state"
 	"errors"
 	"fmt"
@@ -13,8 +13,6 @@ import (
 	"math"
 	"net"
 	"time"
-
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -41,77 +39,26 @@ const (
 	SHOOT actionType = 1
 )
 
-type playerAction interface {
-	ActionType() actionType
-}
-
-type moveAction struct {
-	dir moveDirection
-}
-
-func (moveAction) ActionType() actionType {
-	return MOVE
-}
-
-type shootAction struct {
-	target geom.Vector2
-}
-
-func (shootAction) ActionType() actionType {
-	return SHOOT
-}
-
-type playerInput struct {
-	id      uint
-	actions []playerAction
-}
-
-func (playerInput) ClientReqName() string {
-	return "player input"
-}
-
-type ClientMsg interface {
-	ClientReqName() string
+type clientInput struct {
+	addr    *net.UDPAddr
+	gameMsg stypes.GameMessage
 }
 
 type TickResults struct {
 	playersDied []uint
 }
 
-// func (clientInput) ClientReqName() string {
-// 	return "client input"
-// }
-
-type clientJoinReq struct {
-	addr     stypes.UDPAddrStr
-	gameName string
-}
-
-func (clientJoinReq) ClientReqName() string {
-	return "join request"
-}
-
-type clientRejoinReq struct {
-	addr     stypes.UDPAddrStr
-	gameName string
-	prevId   uint
-}
-
-func (clientRejoinReq) ClientReqName() string {
-	return "rejoin request"
-}
-
-func moveDelta(inputs map[moveDirection]bool, delta float32) geom.Vector2 {
+func moveDelta(inputs map[stypes.Direction]bool, delta float32) geom.Vector2 {
 	dx, dy := 0.0, 0.0
 	for act := range inputs {
 		switch act {
-		case DIR_LEFT:
+		case stypes.LEFT:
 			dx = -playerSpeed
-		case DIR_RIGHT:
+		case stypes.RIGHT:
 			dx = playerSpeed
-		case DIR_UP:
+		case stypes.UP:
 			dy = -playerSpeed
-		case DIR_DOWN:
+		case stypes.DOWN:
 			dy = playerSpeed
 		default:
 			continue
@@ -127,80 +74,13 @@ func moveDelta(inputs map[moveDirection]bool, delta float32) geom.Vector2 {
 	return geom.NewVector(float32(dx)*delta, float32(dy)*delta)
 }
 
-func extractPlayerInput(pi *pb.PlayerInput) *playerInput {
-	// fmt.Println("extract player id:", pi.PlayerId)
-	playerIn := playerInput{
-		actions: []playerAction{},
-		id:      uint(pi.PlayerId),
-	}
-
-	for _, playerAct := range pi.PlayerActions {
-		switch act := playerAct.Action.(type) {
-		case *pb.PlayerAction_Move:
-			if act.Move.Dir == pb.Direction_DOWN {
-				playerIn.actions = append(playerIn.actions, moveAction{DIR_DOWN})
-			}
-			if act.Move.Dir == pb.Direction_UP {
-				playerIn.actions = append(playerIn.actions, moveAction{DIR_UP})
-			}
-			if act.Move.Dir == pb.Direction_RIGHT {
-				playerIn.actions = append(playerIn.actions, moveAction{DIR_RIGHT})
-			}
-			if act.Move.Dir == pb.Direction_LEFT {
-				playerIn.actions = append(playerIn.actions, moveAction{DIR_LEFT})
-			}
-			break
-		case *pb.PlayerAction_Shoot:
-			playerIn.actions = append(playerIn.actions, shootAction{
-				geom.NewVector(
-					playerAct.GetShoot().Target.X,
-					playerAct.GetShoot().Target.Y,
-				),
-			})
-			break
-		}
-	}
-
-	return &playerIn
-}
-
-func clientInputHandler(conn *net.UDPConn, inputChan chan ClientMsg) {
-	buf := make([]byte, 1024)
+func clientInputHandler(conn *gameConn.ServerConn, inputChan chan clientInput) {
 	for {
-		n, clientAddr, err := conn.ReadFromUDP(buf)
+		clientMsg, clientAddr, err := conn.Recieve()
 		if err != nil {
 			continue
 		}
-
-		var gameMsg pb.GameMessage
-		if err := proto.Unmarshal(buf[:n], &gameMsg); err != nil {
-			fmt.Println(err)
-			continue
-		}
-
-		clientAddrStr := stypes.UDPAddrStr(clientAddr.String())
-
-		switch payload := gameMsg.Payload.(type) {
-		case *pb.GameMessage_PlayerInput:
-			// fmt.Println("player input:", payload)
-			playerIn := extractPlayerInput(payload.PlayerInput)
-			// fmt.Println("player in:", playerIn)
-			inputChan <- playerIn
-		case *pb.GameMessage_ConnectRequest:
-			joinReq := payload.ConnectRequest
-			inputChan <- &clientJoinReq{
-				addr:     clientAddrStr,
-				gameName: joinReq.GameName,
-			}
-		case *pb.GameMessage_ReconnectRequest:
-			rejoinReq := payload.ReconnectRequest
-			inputChan <- &clientRejoinReq{
-				addr:   clientAddrStr,
-				prevId: uint(rejoinReq.OldPlayerId),
-			}
-		default:
-			fmt.Println("unrecognized game message:", payload)
-		}
+		inputChan <- clientInput{clientAddr, clientMsg}
 	}
 }
 
@@ -245,21 +125,19 @@ func movePlayer(serverWorld *wstate.ServerWorld, id uint, delta geom.Vector2) {
 	serverWorld.AddPlayerState(player)
 }
 
-func handleClientInputs(serverWorld *wstate.ServerWorld, clientInput *playerInput) {
-	dirMap := make(map[moveDirection]bool)
-	// fmt.Println("client inputs:", *clientInput)
-	for _, action := range clientInput.actions {
-		// fmt.Println("player id:", clientInput.id)
+func handleClientInputs(serverWorld *wstate.ServerWorld, clientInput *stypes.PlayerInput) {
+	dirMap := make(map[stypes.Direction]bool)
+	playerId := uint(clientInput.PlayerId)
+	for _, action := range clientInput.Actions {
 		switch act := action.(type) {
-		case moveAction:
-			dirMap[act.dir] = true
+		case *stypes.MoveAction:
+			dirMap[act.Dir] = true
 			break
-		case shootAction:
-			playerId := clientInput.id
+		case *stypes.ShootAction:
 			if serverWorld.DurSinceLastBullet(playerId) > time.Duration(config.BulletCooldownMS)*time.Millisecond {
 				playerState := serverWorld.PlayerSnapshot(playerId)
 				serverWorld.StartPlayerBulletCD(playerId)
-				serverWorld.AddBulletState(wstate.NewBulletState(playerState, act.target))
+				serverWorld.AddBulletState(wstate.NewBulletState(playerState, act.Target))
 			}
 			break
 		default:
@@ -267,10 +145,10 @@ func handleClientInputs(serverWorld *wstate.ServerWorld, clientInput *playerInpu
 		}
 	}
 	delta := moveDelta(dirMap, 1.0/ticksPerSecond)
-	movePlayer(serverWorld, clientInput.id, delta)
+	movePlayer(serverWorld, playerId, delta)
 }
 
-func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]playerInput) []uint {
+func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]stypes.PlayerInput) []uint {
 	for i, bullet := range serverWorld.BulletSnapshots() {
 		if time.Since(bullet.Born) > time.Duration(config.BulletTimeToLiveSec*float64(time.Second)) {
 			serverWorld.RemoveBullet(i)
@@ -285,7 +163,7 @@ func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]pla
 	}
 
 	for _, ci := range playerInputs {
-		if serverWorld.HasPlayer(ci.id) {
+		if serverWorld.HasPlayer(uint(ci.PlayerId)) {
 			handleClientInputs(serverWorld, &ci)
 		}
 	}
@@ -293,143 +171,106 @@ func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]pla
 	return calculateHits(serverWorld)
 }
 
-func buildPBWorldState(serverWorld *wstate.ServerWorld) *pb.WorldState {
-	pbWorld := &pb.WorldState{}
+func buildNetworkWorldState(serverWorld *wstate.ServerWorld) *stypes.WorldState {
+	netWorld := &stypes.WorldState{}
 
 	players := serverWorld.PlayerSnapshots()
 	for _, player := range players {
-		pbPlayer := pb.BuildPlayerState(player.Pos, player.Health(), uint32(player.Id))
-		pbWorld.Players = append(pbWorld.Players, &pbPlayer)
+		netWorld.Players = append(netWorld.Players, stypes.NewPlayerState(
+			uint32(player.Id),
+			player.Pos,
+			float32(player.Health()),
+		))
 	}
 
 	for _, bullet := range serverWorld.BulletSnapshots() {
-		pbBullet := pb.BuildBulletState(bullet.Pos, bullet.Size, uint32(bullet.OwnerId))
-		pbWorld.Bullets = append(pbWorld.Bullets, &pbBullet)
+		netWorld.Bullets = append(netWorld.Bullets, stypes.NewBulletState(
+			uint32(bullet.OwnerId),
+			bullet.Pos,
+			bullet.Size,
+		))
 	}
 
-	pbWorld.TickNum = serverWorld.Tick()
+	netWorld.TickNum = serverWorld.Tick()
 
-	return pbWorld
+	return netWorld
 }
 
-func openUDPConn() *net.UDPConn {
-	addr := net.UDPAddr{
-		Port: port,
-		IP:   net.ParseIP(config.ServerIP),
-	}
-
-	conn, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return conn
-}
-
-func sendWorldToClients(sw wstate.ServerWorld, conn *net.UDPConn, pbWorld *pb.WorldState) {
-	worldMsg := pb.WrapGameMessage(&pb.GameMessage_World{
-		World: pbWorld,
-	})
-	// fmt.Println("game message:", worldMsg)
-	data, err := proto.Marshal(worldMsg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// fmt.Println("tick num:", sw.Tick())
-	// ms := rand.Intn(10) + 35
-	// fmt.Println("ms:", ms)
-	// time.Sleep(time.Duration(ms) * time.Millisecond)
-	// fmt.Printf("data size: %d\n", len(data))
-	for _, addr := range sw.AddressSnapshots() {
-		netAddr, _ := net.ResolveUDPAddr("udp", string(addr))
-		conn.WriteToUDP(data, netAddr)
-	}
-}
-
-func handleWorldTick(sw *wstate.ServerWorld, playerInputs map[uint]playerInput) *TickResults {
+func handleWorldTick(sw *wstate.ServerWorld, playerInputs map[uint]stypes.PlayerInput) *TickResults {
 	playersDied := updateWorldState(sw, playerInputs)
 	return &TickResults{
 		playersDied: playersDied,
 	}
 }
 
-func handlePlayerConnect(sw *wstate.ServerWorld, req *clientJoinReq) *pb.GameMessage {
-	newPlayer := wstate.NewPlayerState(geom.NewVector(500, 500), req.addr)
-	sw.AddAddress(newPlayer.Id, newPlayer.Addr)
+func handlePlayerConnect(sw *wstate.ServerWorld, req *stypes.ConnectRequest, addr *net.UDPAddr) *stypes.ConnectAck {
+	newPlayer := wstate.NewPlayerState(geom.NewVector(500, 500), addr)
+	sw.AddAddress(newPlayer.Id, addr)
 	fmt.Println("new player:", newPlayer)
 	sw.AddPlayerState(newPlayer)
-	return pb.BuildConnectAck(&stypes.ConnectAck{PlayerId: uint32(newPlayer.Id)})
+	return &stypes.ConnectAck{PlayerId: uint32(newPlayer.Id)}
 }
 
-func handlePlayerReconnect(sw *wstate.ServerWorld, req *clientRejoinReq) (*pb.GameMessage, error) {
-	if sw.GetAddress(req.prevId) != req.addr {
+func handlePlayerReconnect(sw *wstate.ServerWorld, req *stypes.ReconnectRequest, addr *net.UDPAddr) (*stypes.ConnectAck, error) {
+	if sw.GetAddress(uint(req.OldPlayerId)) != addr {
 		return nil, errors.New("didn't find player")
 	}
-	sw.RemovePlayerAddress(req.prevId)
-	newPlayer := wstate.NewPlayerState(geom.NewVector(500, 500), req.addr)
+	sw.RemovePlayerAddress(uint(req.OldPlayerId))
+	newPlayer := wstate.NewPlayerState(geom.NewVector(500, 500), addr)
 	sw.AddAddress(newPlayer.Id, newPlayer.Addr)
 	fmt.Println("new player:", newPlayer)
 	sw.AddPlayerState(newPlayer)
-	return pb.BuildConnectAck(&stypes.ConnectAck{PlayerId: uint32(newPlayer.Id)}), nil
+	connectAck := &stypes.ConnectAck{PlayerId: uint32(newPlayer.Id)}
+	return connectAck, nil
 }
 
-func sendConnectAck(conn *net.UDPConn, ack *pb.GameMessage, clientAddr stypes.UDPAddrStr) {
-	data, err := proto.Marshal(ack)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("player addr:", clientAddr)
-	netAddr, _ := net.ResolveUDPAddr("udp", string(clientAddr))
-	conn.WriteToUDP(data, netAddr)
-}
-
-func notifyDeadPlayers(sw *wstate.ServerWorld, conn *net.UDPConn, playerIds []uint) {
+func notifyDeadPlayers(sw *wstate.ServerWorld, conn *gameConn.ServerConn, playerIds []uint) {
 	for _, id := range playerIds {
-		data, err := proto.Marshal(pb.BuildDeathNote(&stypes.DeathNote{PlayerId: uint32(id)}))
-		if err != nil {
-			log.Fatal(err)
-		}
-		netAddr, _ := net.ResolveUDPAddr("udp", string(sw.GetAddress(id)))
-		conn.WriteToUDP(data, netAddr)
+		conn.SendTo(stypes.NewDeathNote(uint32(id)), sw.GetAddress(id))
 	}
 }
 
 func main() {
-	conn := openUDPConn()
+	conn, err := gameConn.NewServerConn(net.ParseIP(config.ServerIP), port)
+	if err != nil {
+		log.Fatal("whoops")
+	}
 	defer conn.Close()
 	fmt.Printf("Listening on udp port %d\n", port)
 
 	serverWorld := wstate.NewServerWorld()
 	clock := time.Tick(time.Second / ticksPerSecond)
-	playerInputs := make(map[uint]playerInput)
+	playerInputs := make(map[uint]stypes.PlayerInput)
 
-	inputChan := make(chan ClientMsg, 10)
+	inputChan := make(chan clientInput, 10)
 	go clientInputHandler(conn, inputChan)
 
 	for {
 		select {
 		case <-clock:
-			// fmt.Println(tick)
 			tickResults := handleWorldTick(&serverWorld, playerInputs)
-			pbWorld := buildPBWorldState(&serverWorld)
+			fmt.Println("server world:", serverWorld)
+			netWorld := buildNetworkWorldState(&serverWorld)
 			serverWorld.IncTick()
 			notifyDeadPlayers(&serverWorld, conn, tickResults.playersDied)
-			go sendWorldToClients(serverWorld, conn, pbWorld)
-			playerInputs = make(map[uint]playerInput) // reset inputs for next tick
+			fmt.Println("sending tick#", netWorld.TickNum)
+			conn.Broadcast(netWorld)
+			playerInputs = make(map[uint]stypes.PlayerInput) // reset inputs for next tick
 		case input := <-inputChan:
-			switch in := input.(type) {
-			case *playerInput:
+			switch in := input.gameMsg.(type) {
+			case *stypes.PlayerInput:
 				// fmt.Println("player input gotten:", *in)
-				playerInputs[in.id] = *in
-			case *clientJoinReq:
-				ackMsg := handlePlayerConnect(&serverWorld, in)
-				sendConnectAck(conn, ackMsg, in.addr)
-			case *clientRejoinReq:
-				ackMsg, err := handlePlayerReconnect(&serverWorld, in)
+				playerInputs[uint(in.PlayerId)] = *in
+			case *stypes.ConnectRequest:
+				conn.AddListener(input.addr)
+				ackMsg := handlePlayerConnect(&serverWorld, in, input.addr)
+				conn.SendTo(ackMsg, input.addr)
+			case *stypes.ReconnectRequest:
+				ackMsg, err := handlePlayerReconnect(&serverWorld, in, input.addr)
 				if err != nil {
 					break
 				}
-				sendConnectAck(conn, ackMsg, in.addr)
+				conn.SendTo(ackMsg, input.addr)
 			default:
 				fmt.Println("player input didn't match any case", input)
 			}

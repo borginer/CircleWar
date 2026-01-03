@@ -2,13 +2,13 @@ package hitboxes
 
 import (
 	"CircleWar/config"
-	sharedtypes "CircleWar/core/types"
+	"CircleWar/core/stypes"
 )
 
-func PlayerSize(health sharedtypes.PlayerHealth) float32 {
+func PlayerSize(health stypes.PlayerHealth) float32 {
 	return config.InitialPlayerSize + (float32(health)-config.InitialPlayerHealth)*config.PlayerShrinkStep
 }
 
-func BulletSize(health sharedtypes.PlayerHealth) float32 {
+func BulletSize(health stypes.PlayerHealth) float32 {
 	return config.InitialBulletSize + (float32(health)-config.InitialPlayerHealth)*config.BulletShrinkStep
 }

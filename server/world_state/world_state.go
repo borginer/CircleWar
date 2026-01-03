@@ -4,8 +4,8 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
-	sharedtypes "CircleWar/core/types"
-	stypes "CircleWar/core/types"
+	stypes "CircleWar/core/stypes"
+	"net"
 	"time"
 )
 
@@ -16,12 +16,12 @@ import (
 type PlayerState struct {
 	LastBulletShot time.Time
 	Pos            geom.Vector2
-	health         sharedtypes.PlayerHealth
-	Addr           stypes.UDPAddrStr
+	health         stypes.PlayerHealth
+	Addr           *net.UDPAddr
 	Id             uint
 }
 
-func (ps PlayerState) Health() sharedtypes.PlayerHealth {
+func (ps PlayerState) Health() stypes.PlayerHealth {
 	return ps.health
 }
 
@@ -31,7 +31,7 @@ func (ps *PlayerState) ChangeHealth(by int) {
 
 var nextPlayerId uint = uint(1)
 
-func NewPlayerState(pos geom.Vector2, addr stypes.UDPAddrStr) PlayerState {
+func NewPlayerState(pos geom.Vector2, addr *net.UDPAddr) PlayerState {
 	ps := PlayerState{time.Now(), pos, config.InitialPlayerHealth, addr, nextPlayerId}
 	nextPlayerId += 1
 	return ps
@@ -67,7 +67,7 @@ type ServerWorld struct {
 	nextBulletId  int
 	players       map[uint]PlayerState
 	bullets       map[int]*BulletState
-	addresses     map[uint]stypes.UDPAddrStr
+	addresses     map[uint]*net.UDPAddr
 	height, width float32
 	tickNum       uint32
 }
@@ -78,7 +78,7 @@ func NewServerWorld() ServerWorld {
 		tickNum:      0,
 		players:      make(map[uint]PlayerState),
 		bullets:      make(map[int]*BulletState),
-		addresses:    make(map[uint]stypes.UDPAddrStr),
+		addresses:    make(map[uint]*net.UDPAddr),
 		height:       config.WorldHeight,
 		width:        config.WorldWidth,
 	}
@@ -100,15 +100,15 @@ func (sw *ServerWorld) Tick() uint32 {
 	return sw.tickNum
 }
 
-func (sw *ServerWorld) AddAddress(playerId uint, addr stypes.UDPAddrStr) {
+func (sw *ServerWorld) AddAddress(playerId uint, addr *net.UDPAddr) {
 	sw.addresses[playerId] = addr
 }
 
-func (sw *ServerWorld) AddressSnapshots() map[uint]stypes.UDPAddrStr {
+func (sw *ServerWorld) AddressSnapshots() map[uint]*net.UDPAddr {
 	return sw.addresses
 }
 
-func (sw *ServerWorld) GetAddress(playerId uint) stypes.UDPAddrStr {
+func (sw *ServerWorld) GetAddress(playerId uint) *net.UDPAddr {
 	return sw.addresses[playerId]
 }
 

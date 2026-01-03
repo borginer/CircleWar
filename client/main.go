@@ -4,8 +4,8 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
-	pb "CircleWar/core/network/protobuf"
-	stypes "CircleWar/core/types"
+	conn "CircleWar/core/network/gameConn"
+	stypes "CircleWar/core/stypes"
 	"errors"
 	"fmt"
 	"log"
@@ -14,7 +14,6 @@ import (
 
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -22,7 +21,7 @@ const (
 	serverIP = config.ServerIP
 )
 
-func drawWorld(world *pb.WorldState, myId uint32) {
+func drawWorld(world *stypes.WorldState, myId uint32) {
 	for i := int32(0); i < config.WorldWidth/100+1; i++ {
 		for j := int32(0); j < config.WorldHeight/100+1; j++ {
 			if i%2 == 1 {
@@ -37,11 +36,9 @@ func drawWorld(world *pb.WorldState, myId uint32) {
 	}
 	var color rl.Color
 	for _, player := range world.Players {
-		// fmt.Println("player health:", player.Health, "size:", hitboxes.PlayerSize(sharedtypes.PlayerHealth(player.Health)))
-		if player.PlayerId == myId {
+		color = rl.Red
+		if player.Id == myId {
 			color = rl.Blue
-		} else {
-			color = rl.Red
 		}
 		rl.DrawCircle(
 			int32(player.Pos.X),
@@ -52,11 +49,9 @@ func drawWorld(world *pb.WorldState, myId uint32) {
 	}
 
 	for _, bullet := range world.Bullets {
-		// fmt.Println("bullet size:", bullet.Size)
+		color = rl.Red
 		if bullet.OwnerId == myId {
 			color = rl.Blue
-		} else {
-			color = rl.Red
 		}
 		rl.DrawCircle(
 			int32(bullet.Pos.X),
@@ -101,32 +96,20 @@ func getPlayerInput() *stypes.PlayerInput {
 	return playerInput
 }
 
-func serverInputHandler(conn *net.UDPConn, serverInput chan *pb.GameMessage) {
-	buf := make([]byte, 1024)
-	i := 0
-	servMsg := &pb.GameMessage{}
+func serverInputHandler(conn *conn.ClientConn, serverInput chan stypes.GameMessage) {
 	for {
-		n, addr, err := conn.ReadFromUDP(buf)
+		servMsg, err := conn.Recieve()
 		if err != nil {
-			fmt.Println("read err:", err)
+			fmt.Println("error receiving from server:", err)
 			continue
 		}
-		fmt.Println("bytes from udp:", n, "addr:", addr)
-		err = proto.Unmarshal(buf[:n], servMsg)
-		if err != nil {
-			fmt.Println("unmarshal err:", err)
-			continue
-		}
-		i++
-		// fmt.Printf("server update number %d at time: %s\n", i, time.Now().String())
 		serverInput <- servMsg
-		servMsg = &pb.GameMessage{}
 	}
 }
 
-func getMyHealth(ws *pb.WorldState, myId uint32) (float32, error) {
+func getMyHealth(ws *stypes.WorldState, myId uint32) (float32, error) {
 	for _, player := range ws.Players {
-		if player.PlayerId == myId {
+		if player.Id == myId {
 			return player.Health, nil
 		}
 	}
@@ -143,7 +126,7 @@ const (
 
 func main() {
 	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", serverIP, port))
-	conn, err := net.DialUDP("udp", nil, serverAddr)
+	conn, err := conn.NewClientConn(serverAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -151,61 +134,44 @@ func main() {
 
 	rl.InitWindow(config.WorldWidth, config.WorldHeight, "CircleWar Client")
 	defer rl.CloseWindow()
-	rl.SetTargetFPS(100)
+	rl.SetTargetFPS(150)
 
-	serverMsg := make(chan *pb.GameMessage)
+	serverMsg := make(chan stypes.GameMessage)
 	go serverInputHandler(conn, serverMsg)
 
-	curWorld := &pb.WorldState{}
+	curWorld := &stypes.WorldState{}
 	var playerId uint32
 	var lastServerTick uint32 = 0
 	status := NONE
 
-	// send connect
-
-	data, err := proto.Marshal(&pb.GameMessage{
-		Payload: &pb.GameMessage_ConnectRequest{
-			ConnectRequest: &pb.ConnectRequest{
-				GameName: "default",
-			},
-		},
-	})
+	err = conn.Send(stypes.NewConnectRequest("default"))
 	if err != nil {
-		log.Fatal("fuck")
+		fmt.Println("error sending connect request:", err)
 	}
-	conn.Write(data)
 
 	for !rl.WindowShouldClose() {
 		if status == ALIVE {
 			playerInput := getPlayerInput()
 			playerInput.PlayerId = playerId
-			// fmt.Println("player input:", playerInput)
-
-			if len(playerInput.Actions) > 0 {
-				inputMsg := pb.BuildPlayerInput(playerInput)
-				data, err := proto.Marshal(inputMsg)
-				if err != nil {
-					log.Fatal(err)
-				}
-				conn.Write(data)
+			err := conn.Send(playerInput)
+			if err != nil {
+				fmt.Println("error sending player input:", err)
 			}
 		}
 
 		select {
 		case msg := <-serverMsg:
-			// fmt.Println("msg:", msg)
-			switch payload := msg.Payload.(type) {
-			case *pb.GameMessage_World:
-				// fmt.Println("tick num:", curWorld.TickNum, "last tick:", lastServerTick)
-				if payload.World.TickNum >= lastServerTick {
-					lastServerTick = payload.World.TickNum
-					curWorld = payload.World
+			switch payload := msg.(type) {
+			case *stypes.WorldState:
+				fmt.Println("world from server:", *payload, "tick:", payload.TickNum)
+				if payload.TickNum >= lastServerTick {
+					lastServerTick = payload.TickNum
+					curWorld = payload
 				}
-			case *pb.GameMessage_ConnectAck:
-				playerId = payload.ConnectAck.PlayerId
-				// fmt.Println("got connectAck, id:", playerId)
+			case *stypes.ConnectAck:
+				playerId = payload.PlayerId
 				status = ALIVE
-			case *pb.GameMessage_DeathNote:
+			case *stypes.DeathNote:
 				status = DEAD
 			}
 		default:
@@ -224,17 +190,10 @@ func main() {
 				X: (config.CameraWidth - bx) / 2, Y: (config.CameraHeight - by) / 2,
 				Width: bx, Height: by,
 			}, "Reconnect") {
-				data, err := proto.Marshal(&pb.GameMessage{
-					Payload: &pb.GameMessage_ReconnectRequest{
-						ReconnectRequest: &pb.ReconnectRequest{
-							OldPlayerId: playerId,
-						},
-					},
-				})
+				err := conn.Send(stypes.NewReconnectRequest(playerId))
 				if err != nil {
-					log.Fatal("fuck")
+					fmt.Println("failed to send reconnect request:", err)
 				}
-				conn.Write(data)
 				status = NONE
 			}
 		}
