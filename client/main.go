@@ -134,7 +134,7 @@ func main() {
 
 	rl.InitWindow(config.WorldWidth, config.WorldHeight, "CircleWar Client")
 	defer rl.CloseWindow()
-	rl.SetTargetFPS(150)
+	rl.SetTargetFPS(200)
 
 	serverMsg := make(chan stypes.GameMessage)
 	go serverInputHandler(conn, serverMsg)
@@ -163,12 +163,13 @@ func main() {
 		case msg := <-serverMsg:
 			switch payload := msg.(type) {
 			case *stypes.WorldState:
-				fmt.Println("world from server:", *payload, "tick:", payload.TickNum)
+				// fmt.Println("world from server:", *payload, "tick:", payload.TickNum)
 				if payload.TickNum >= lastServerTick {
 					lastServerTick = payload.TickNum
 					curWorld = payload
 				}
 			case *stypes.ConnectAck:
+				fmt.Println("got ack")
 				playerId = payload.PlayerId
 				status = ALIVE
 			case *stypes.DeathNote:

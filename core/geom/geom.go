@@ -1,6 +1,9 @@
 package geom
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type Vector2 struct{ X, Y float32 }
 
@@ -20,6 +23,10 @@ func (v Vector2) DistTo(other Vector2) float32 {
 	return float32(math.Sqrt(math.Pow(float64(v.X-other.X), 2) + math.Pow(float64(v.Y-other.Y), 2)))
 }
 
+func (v Vector2) String() string {
+	return fmt.Sprintf("Vector(%f, %f)", v.X, v.Y)
+}
+
 func limit(value, ll, ul float32) float32 {
 	if value < ll {
 		return ll
@@ -34,12 +41,8 @@ func (v Vector2) Limited(lx, ly, ux, uy float32) Vector2 {
 	return NewVector(limit(v.X, lx, ux), limit(v.Y, ly, uy))
 }
 
-func (v Vector2) Equal(other Vector2) bool {
-	return v.X == other.X && v.Y == other.Y
-}
-
 func (v Vector2) InsideSquare(lx, ly, ux, uy, buffer float32) bool {
-	return v.Equal(v.Limited(lx-buffer, ly-buffer, ux+buffer, uy+buffer))
+	return v == v.Limited(lx-buffer, ly-buffer, ux+buffer, uy+buffer)
 }
 
 func (v Vector2) normalized() Vector2 {

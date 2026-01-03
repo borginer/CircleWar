@@ -40,7 +40,7 @@ const (
 )
 
 type clientInput struct {
-	addr    *net.UDPAddr
+	addr    net.UDPAddr
 	gameMsg stypes.GameMessage
 }
 
@@ -203,7 +203,7 @@ func handleWorldTick(sw *wstate.ServerWorld, playerInputs map[uint]stypes.Player
 	}
 }
 
-func handlePlayerConnect(sw *wstate.ServerWorld, req *stypes.ConnectRequest, addr *net.UDPAddr) *stypes.ConnectAck {
+func handlePlayerConnect(sw *wstate.ServerWorld, req *stypes.ConnectRequest, addr net.UDPAddr) *stypes.ConnectAck {
 	newPlayer := wstate.NewPlayerState(geom.NewVector(500, 500), addr)
 	sw.AddAddress(newPlayer.Id, addr)
 	fmt.Println("new player:", newPlayer)
@@ -211,8 +211,9 @@ func handlePlayerConnect(sw *wstate.ServerWorld, req *stypes.ConnectRequest, add
 	return &stypes.ConnectAck{PlayerId: uint32(newPlayer.Id)}
 }
 
-func handlePlayerReconnect(sw *wstate.ServerWorld, req *stypes.ReconnectRequest, addr *net.UDPAddr) (*stypes.ConnectAck, error) {
-	if sw.GetAddress(uint(req.OldPlayerId)) != addr {
+func handlePlayerReconnect(sw *wstate.ServerWorld, req *stypes.ReconnectRequest, addr net.UDPAddr) (*stypes.ConnectAck, error) {
+	oldAddr := sw.GetAddress(uint(req.OldPlayerId))
+	if oldAddr.String() != addr.String() {
 		return nil, errors.New("didn't find player")
 	}
 	sw.RemovePlayerAddress(uint(req.OldPlayerId))
@@ -249,11 +250,11 @@ func main() {
 		select {
 		case <-clock:
 			tickResults := handleWorldTick(&serverWorld, playerInputs)
-			fmt.Println("server world:", serverWorld)
+			// fmt.Println("server world:", serverWorld)
 			netWorld := buildNetworkWorldState(&serverWorld)
-			serverWorld.IncTick()
+			serverWorld.NextTick()
 			notifyDeadPlayers(&serverWorld, conn, tickResults.playersDied)
-			fmt.Println("sending tick#", netWorld.TickNum)
+			// fmt.Println("sending tick#", netWorld.TickNum)
 			conn.Broadcast(netWorld)
 			playerInputs = make(map[uint]stypes.PlayerInput) // reset inputs for next tick
 		case input := <-inputChan:
@@ -266,6 +267,7 @@ func main() {
 				ackMsg := handlePlayerConnect(&serverWorld, in, input.addr)
 				conn.SendTo(ackMsg, input.addr)
 			case *stypes.ReconnectRequest:
+				fmt.Println("sending ack msg")
 				ackMsg, err := handlePlayerReconnect(&serverWorld, in, input.addr)
 				if err != nil {
 					break

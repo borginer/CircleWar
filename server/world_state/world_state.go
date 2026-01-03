@@ -9,15 +9,11 @@ import (
 	"time"
 )
 
-// type StateObject interface {
-// 	ObjectType() string
-// }
-
 type PlayerState struct {
 	LastBulletShot time.Time
 	Pos            geom.Vector2
 	health         stypes.PlayerHealth
-	Addr           *net.UDPAddr
+	Addr           net.UDPAddr
 	Id             uint
 }
 
@@ -31,15 +27,11 @@ func (ps *PlayerState) ChangeHealth(by int) {
 
 var nextPlayerId uint = uint(1)
 
-func NewPlayerState(pos geom.Vector2, addr *net.UDPAddr) PlayerState {
+func NewPlayerState(pos geom.Vector2, addr net.UDPAddr) PlayerState {
 	ps := PlayerState{time.Now(), pos, config.InitialPlayerHealth, addr, nextPlayerId}
 	nextPlayerId += 1
 	return ps
 }
-
-// func (playerState) ObjectType() string {
-// 	return "player"
-// }
 
 type BulletState struct {
 	OwnerId uint
@@ -59,15 +51,11 @@ func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
 	}
 }
 
-// func (bulletState) ObjectType() string {
-// 	return "bullet"
-// }
-
 type ServerWorld struct {
 	nextBulletId  int
 	players       map[uint]PlayerState
 	bullets       map[int]*BulletState
-	addresses     map[uint]*net.UDPAddr
+	addresses     map[uint]net.UDPAddr
 	height, width float32
 	tickNum       uint32
 }
@@ -78,7 +66,7 @@ func NewServerWorld() ServerWorld {
 		tickNum:      0,
 		players:      make(map[uint]PlayerState),
 		bullets:      make(map[int]*BulletState),
-		addresses:    make(map[uint]*net.UDPAddr),
+		addresses:    make(map[uint]net.UDPAddr),
 		height:       config.WorldHeight,
 		width:        config.WorldWidth,
 	}
@@ -92,7 +80,7 @@ func (sw *ServerWorld) Height() float32 {
 	return sw.height
 }
 
-func (sw *ServerWorld) IncTick() {
+func (sw *ServerWorld) NextTick() {
 	sw.tickNum++
 }
 
@@ -100,15 +88,15 @@ func (sw *ServerWorld) Tick() uint32 {
 	return sw.tickNum
 }
 
-func (sw *ServerWorld) AddAddress(playerId uint, addr *net.UDPAddr) {
+func (sw *ServerWorld) AddAddress(playerId uint, addr net.UDPAddr) {
 	sw.addresses[playerId] = addr
 }
 
-func (sw *ServerWorld) AddressSnapshots() map[uint]*net.UDPAddr {
+func (sw *ServerWorld) AddressSnapshots() map[uint]net.UDPAddr {
 	return sw.addresses
 }
 
-func (sw *ServerWorld) GetAddress(playerId uint) *net.UDPAddr {
+func (sw *ServerWorld) GetAddress(playerId uint) net.UDPAddr {
 	return sw.addresses[playerId]
 }
 

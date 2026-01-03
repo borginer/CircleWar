@@ -69,13 +69,13 @@ func NewServerConn(ip net.IP, port int) (*ServerConn, error) {
 	return &ServerConn{conn, []net.UDPAddr{}, sync.Mutex{}}, nil
 }
 
-func (sc *ServerConn) AddListener(newListener *net.UDPAddr) {
+func (sc *ServerConn) AddListener(newListener net.UDPAddr) {
 	sc.cmu.Lock()
 	defer sc.cmu.Unlock()
-	sc.clients = append(sc.clients, *newListener)
+	sc.clients = append(sc.clients, newListener)
 }
 
-func (sc *ServerConn) RemoveListener(listener *net.UDPAddr) {
+func (sc *ServerConn) RemoveListener(listener net.UDPAddr) {
 	sc.cmu.Lock()
 	defer sc.cmu.Unlock()
 }
@@ -88,7 +88,7 @@ func (sc *ServerConn) Broadcast(msg stypes.GameMessage) error {
 	sc.cmu.Lock()
 	defer sc.cmu.Unlock()
 	for _, addr := range sc.clients {
-		err := sc.SendTo(msg, &addr)
+		err := sc.SendTo(msg, addr)
 		if err != nil {
 			return err
 		}
@@ -96,12 +96,12 @@ func (sc *ServerConn) Broadcast(msg stypes.GameMessage) error {
 	return nil
 }
 
-func (cc *ServerConn) SendTo(msg stypes.GameMessage, addr *net.UDPAddr) error {
+func (cc *ServerConn) SendTo(msg stypes.GameMessage, addr net.UDPAddr) error {
 	bytes, err := msg.Serialize()
 	if err != nil {
 		return err
 	} else {
-		_, err := cc.conn.WriteToUDP(bytes, addr)
+		_, err := cc.conn.WriteToUDP(bytes, &addr)
 		if err != nil {
 			return err
 		}
@@ -109,16 +109,16 @@ func (cc *ServerConn) SendTo(msg stypes.GameMessage, addr *net.UDPAddr) error {
 	return nil
 }
 
-func (cc *ServerConn) Recieve() (stypes.GameMessage, *net.UDPAddr, error) {
+func (cc *ServerConn) Recieve() (stypes.GameMessage, net.UDPAddr, error) {
 	buf := make([]byte, 1024)
 	n, addr, err := cc.conn.ReadFromUDP(buf)
 	if err != nil {
-		return nil, nil, err
+		return nil, net.UDPAddr{}, err
 	} else {
 		gameMsg, err := stypes.Deserialize(buf, uint32(n))
 		if err != nil {
-			return nil, nil, err
+			return nil, net.UDPAddr{}, err
 		}
-		return gameMsg, addr, nil
+		return gameMsg, *addr, nil
 	}
 }
