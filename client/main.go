@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sort"
 	"strconv"
 
 	gui "github.com/gen2brain/raylib-go/raygui"
@@ -35,6 +36,9 @@ func drawWorld(world *netmsg.WorldState, myId uint32) {
 		}
 	}
 	var color rl.Color
+	sort.Slice(world.Players, func(i, j int) bool {
+		return world.Players[i].Id < world.Players[j].Id
+	})
 	for _, player := range world.Players {
 		color = rl.Red
 		if player.Id == myId {

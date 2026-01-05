@@ -67,6 +67,11 @@ type ServerWorld struct {
 	tickNum       uint32
 }
 
+func (sw *ServerWorld) RevivePlayer(pid uint) {
+	ps := PlayerState{time.Now(), geom.NewVector(500, 500), config.InitialPlayerHealth, sw.GetAddress(pid), pid}
+	sw.AddPlayerState(ps)
+}
+
 func (sw *ServerWorld) InitPlayerWants(pid uint) {
 	sw.playerWants[pid] = &PlayerWants{make(map[stypes.Direction]bool)}
 }

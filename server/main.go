@@ -25,20 +25,6 @@ const (
 	ticksPerSecond = 60
 )
 
-type actionType int16
-type moveDirection int8
-
-const (
-	DIR_LEFT  moveDirection = 0
-	DIR_RIGHT moveDirection = 1
-	DIR_UP    moveDirection = 2
-	DIR_DOWN  moveDirection = 3
-)
-const (
-	MOVE  actionType = 0
-	SHOOT actionType = 1
-)
-
 type clientInput struct {
 	addr    net.UDPAddr
 	gameMsg stypes.GameMessage
@@ -98,7 +84,6 @@ func calculateHits(serverWorld *wstate.ServerWorld) []uint {
 
 			if playerPos.DistTo(bulletPos) < (playerRad+bulletRad)*0.9 {
 				player.ChangeHealth(-1)
-				// fmt.Println("player health:", player.Health())
 				if int(player.Health()) <= 0 {
 					fmt.Println("removing player")
 					deadPlayers = append(deadPlayers, player.Id)
@@ -167,7 +152,7 @@ func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]sty
 	}
 
 	for _, ci := range playerInputs {
-		fmt.Println("input from pid:", ci.PlayerId)
+		// fmt.Println("input from pid:", ci.PlayerId)
 		clear(serverWorld.PlayerWants(uint(ci.PlayerId)).MoveDirs)
 
 		if serverWorld.HasPlayer(uint(ci.PlayerId)) {
@@ -225,12 +210,8 @@ func handlePlayerReconnect(sw *wstate.ServerWorld, req *stypes.ReconnectRequest,
 	if oldAddr.String() != addr.String() {
 		return nil, errors.New("didn't find player")
 	}
-	sw.RemovePlayerAddress(uint(req.OldPlayerId))
-	newPlayer := wstate.NewPlayerState(geom.NewVector(500, 500), addr)
-	sw.AddAddress(newPlayer.Id, newPlayer.Addr)
-	fmt.Println("new player:", newPlayer)
-	sw.AddPlayerState(newPlayer)
-	connectAck := &stypes.ConnectAck{PlayerId: uint32(newPlayer.Id)}
+	sw.RevivePlayer(uint(req.OldPlayerId))
+	connectAck := &stypes.ConnectAck{PlayerId: uint32(req.OldPlayerId)}
 	return connectAck, nil
 }
 
@@ -263,7 +244,7 @@ func main() {
 			netWorld := buildNetworkWorldState(&serverWorld)
 			serverWorld.NextTick()
 			notifyDeadPlayers(&serverWorld, conn, tickResults.playersDied)
-			fmt.Println("sending tick#", netWorld.TickNum)
+			// fmt.Println("sending tick#", netWorld.TickNum)
 			conn.Broadcast(netWorld)
 			playerInputs = make(map[uint]stypes.PlayerInput) // reset inputs for next tick
 		case input := <-inputChan:

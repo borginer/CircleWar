@@ -1,7 +1,7 @@
 package gameConn
 
 import (
-	stypes "CircleWar/core/netmsg"
+	"CircleWar/core/netmsg"
 	"net"
 	"sync"
 )
@@ -22,7 +22,7 @@ func (cc *ClientConn) Close() error {
 	return cc.conn.Close()
 }
 
-func (cc *ClientConn) Send(msg stypes.GameMessage) error {
+func (cc *ClientConn) Send(msg netmsg.GameMessage) error {
 	bytes, err := msg.Serialize()
 	if err != nil {
 		return err
@@ -36,13 +36,13 @@ func (cc *ClientConn) Send(msg stypes.GameMessage) error {
 }
 
 // calls ReadFromUDP aka blocks
-func (cc *ClientConn) Recieve() (stypes.GameMessage, error) {
+func (cc *ClientConn) Recieve() (netmsg.GameMessage, error) {
 	buf := make([]byte, 1024)
 	n, _, err := cc.conn.ReadFromUDP(buf)
 	if err != nil {
 		return nil, err
 	} else {
-		gameMsg, err := stypes.Deserialize(buf, uint32(n))
+		gameMsg, err := netmsg.Deserialize(buf, uint32(n))
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +84,7 @@ func (sc *ServerConn) Close() error {
 	return sc.conn.Close()
 }
 
-func (sc *ServerConn) Broadcast(msg stypes.GameMessage) error {
+func (sc *ServerConn) Broadcast(msg netmsg.GameMessage) error {
 	sc.cmu.Lock()
 	defer sc.cmu.Unlock()
 	for _, addr := range sc.clients {
@@ -96,7 +96,7 @@ func (sc *ServerConn) Broadcast(msg stypes.GameMessage) error {
 	return nil
 }
 
-func (cc *ServerConn) SendTo(msg stypes.GameMessage, addr net.UDPAddr) error {
+func (cc *ServerConn) SendTo(msg netmsg.GameMessage, addr net.UDPAddr) error {
 	bytes, err := msg.Serialize()
 	if err != nil {
 		return err
@@ -109,13 +109,13 @@ func (cc *ServerConn) SendTo(msg stypes.GameMessage, addr net.UDPAddr) error {
 	return nil
 }
 
-func (cc *ServerConn) Recieve() (stypes.GameMessage, net.UDPAddr, error) {
+func (cc *ServerConn) Recieve() (netmsg.GameMessage, net.UDPAddr, error) {
 	buf := make([]byte, 1024)
 	n, addr, err := cc.conn.ReadFromUDP(buf)
 	if err != nil {
 		return nil, net.UDPAddr{}, err
 	} else {
-		gameMsg, err := stypes.Deserialize(buf, uint32(n))
+		gameMsg, err := netmsg.Deserialize(buf, uint32(n))
 		if err != nil {
 			return nil, net.UDPAddr{}, err
 		}
