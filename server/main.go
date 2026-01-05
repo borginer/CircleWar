@@ -4,8 +4,8 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
-	"CircleWar/core/network/gameConn"
 	stypes "CircleWar/core/netmsg"
+	"CircleWar/core/network/gameConn"
 	wstate "CircleWar/server/world_state"
 	"errors"
 	"fmt"
@@ -114,7 +114,7 @@ func calculateHits(serverWorld *wstate.ServerWorld) []uint {
 }
 
 func movePlayer(serverWorld *wstate.ServerWorld, id uint, delta geom.Vector2) {
-	player := serverWorld.PlayerSnapshot(id)
+	player := serverWorld.Player(id)
 	playerSize := hitboxes.PlayerSize(player.Health())
 	player.Pos = player.Pos.Add(delta).Limited(
 		playerSize,
@@ -122,30 +122,34 @@ func movePlayer(serverWorld *wstate.ServerWorld, id uint, delta geom.Vector2) {
 		serverWorld.Width()-playerSize,
 		serverWorld.Height()-playerSize,
 	)
-	serverWorld.AddPlayerState(player)
 }
 
 func handleClientInputs(serverWorld *wstate.ServerWorld, clientInput *stypes.PlayerInput) {
-	dirMap := make(map[stypes.Direction]bool)
 	playerId := uint(clientInput.PlayerId)
 	for _, action := range clientInput.Actions {
 		switch act := action.(type) {
 		case *stypes.MoveAction:
-			dirMap[act.Dir] = true
+			serverWorld.PlayerWants(playerId).MoveDirs[act.Dir] = true
 			break
 		case *stypes.ShootAction:
 			if serverWorld.DurSinceLastBullet(playerId) > time.Duration(config.BulletCooldownMS)*time.Millisecond {
-				playerState := serverWorld.PlayerSnapshot(playerId)
+				playerState := serverWorld.Player(playerId)
 				serverWorld.StartPlayerBulletCD(playerId)
-				serverWorld.AddBulletState(wstate.NewBulletState(playerState, act.Target))
+				serverWorld.AddBulletState(wstate.NewBulletState(*playerState, act.Target))
 			}
 			break
 		default:
 			fmt.Println("unrecognized player action!")
 		}
 	}
-	delta := moveDelta(dirMap, 1.0/ticksPerSecond)
-	movePlayer(serverWorld, playerId, delta)
+}
+
+func changeEntityStates(serverWorld *wstate.ServerWorld) {
+	for _, player := range serverWorld.PlayerSnapshots() {
+		playerId := player.Id
+		delta := moveDelta(serverWorld.PlayerWants(playerId).MoveDirs, 1.0/ticksPerSecond)
+		movePlayer(serverWorld, playerId, delta)
+	}
 }
 
 func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]stypes.PlayerInput) []uint {
@@ -163,10 +167,15 @@ func updateWorldState(serverWorld *wstate.ServerWorld, playerInputs map[uint]sty
 	}
 
 	for _, ci := range playerInputs {
+		fmt.Println("input from pid:", ci.PlayerId)
+		clear(serverWorld.PlayerWants(uint(ci.PlayerId)).MoveDirs)
+
 		if serverWorld.HasPlayer(uint(ci.PlayerId)) {
 			handleClientInputs(serverWorld, &ci)
 		}
 	}
+
+	changeEntityStates(serverWorld)
 
 	return calculateHits(serverWorld)
 }
@@ -254,7 +263,7 @@ func main() {
 			netWorld := buildNetworkWorldState(&serverWorld)
 			serverWorld.NextTick()
 			notifyDeadPlayers(&serverWorld, conn, tickResults.playersDied)
-			// fmt.Println("sending tick#", netWorld.TickNum)
+			fmt.Println("sending tick#", netWorld.TickNum)
 			conn.Broadcast(netWorld)
 			playerInputs = make(map[uint]stypes.PlayerInput) // reset inputs for next tick
 		case input := <-inputChan:

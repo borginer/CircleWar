@@ -4,6 +4,7 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
+	"CircleWar/core/netmsg"
 	stypes "CircleWar/core/netmsg"
 	"net"
 	"time"
@@ -51,20 +52,35 @@ func NewBulletState(player PlayerState, target geom.Vector2) BulletState {
 	}
 }
 
+type PlayerWants struct {
+	// TODO: think of a better way to do player inputs
+	MoveDirs map[netmsg.Direction]bool //toggle
+}
+
 type ServerWorld struct {
 	nextBulletId  int
-	players       map[uint]PlayerState
+	players       map[uint]*PlayerState
+	playerWants   map[uint]*PlayerWants
 	bullets       map[int]*BulletState
 	addresses     map[uint]net.UDPAddr
 	height, width float32
 	tickNum       uint32
 }
 
+func (sw *ServerWorld) InitPlayerWants(pid uint) {
+	sw.playerWants[pid] = &PlayerWants{make(map[stypes.Direction]bool)}
+}
+
+func (sw *ServerWorld) PlayerWants(pid uint) *PlayerWants {
+	return sw.playerWants[pid]
+}
+
 func NewServerWorld() ServerWorld {
 	return ServerWorld{
 		nextBulletId: 0,
 		tickNum:      0,
-		players:      make(map[uint]PlayerState),
+		players:      make(map[uint]*PlayerState),
+		playerWants:  make(map[uint]*PlayerWants),
 		bullets:      make(map[int]*BulletState),
 		addresses:    make(map[uint]net.UDPAddr),
 		height:       config.WorldHeight,
@@ -118,13 +134,14 @@ func (sw *ServerWorld) DurSinceLastBullet(id uint) time.Duration {
 func (sw *ServerWorld) PlayerSnapshots() []PlayerState {
 	snapshot := []PlayerState{}
 	for _, state := range sw.players {
-		snapshot = append(snapshot, state)
+		snapshot = append(snapshot, *state)
 	}
 	return snapshot
 }
 
 func (sw *ServerWorld) AddPlayerState(player PlayerState) {
-	sw.players[player.Id] = player
+	sw.players[player.Id] = &player
+	sw.InitPlayerWants(player.Id)
 }
 
 func (sw *ServerWorld) HasPlayer(id uint) bool {
@@ -136,7 +153,7 @@ func (sw *ServerWorld) RemovePlayerState(id uint) {
 	delete(sw.players, id)
 }
 
-func (sw *ServerWorld) PlayerSnapshot(id uint) PlayerState {
+func (sw *ServerWorld) Player(id uint) *PlayerState {
 	return sw.players[id]
 }
 
