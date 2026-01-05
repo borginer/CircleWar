@@ -4,8 +4,8 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
+	"CircleWar/core/netmsg"
 	conn "CircleWar/core/network/gameConn"
-	stypes "CircleWar/core/stypes"
 	"errors"
 	"fmt"
 	"log"
@@ -21,7 +21,7 @@ const (
 	serverIP = config.ServerIP
 )
 
-func drawWorld(world *stypes.WorldState, myId uint32) {
+func drawWorld(world *netmsg.WorldState, myId uint32) {
 	for i := int32(0); i < config.WorldWidth/100+1; i++ {
 		for j := int32(0); j < config.WorldHeight/100+1; j++ {
 			if i%2 == 1 {
@@ -43,7 +43,7 @@ func drawWorld(world *stypes.WorldState, myId uint32) {
 		rl.DrawCircle(
 			int32(player.Pos.X),
 			int32(player.Pos.Y),
-			hitboxes.PlayerSize(stypes.PlayerHealth(player.Health)),
+			hitboxes.PlayerSize(netmsg.PlayerHealth(player.Health)),
 			color,
 		)
 	}
@@ -62,29 +62,29 @@ func drawWorld(world *stypes.WorldState, myId uint32) {
 	}
 }
 
-func addPlayerDirAction(pi *stypes.PlayerInput, dir stypes.Direction) {
-	pi.Actions = append(pi.Actions, &stypes.MoveAction{Dir: dir})
+func addPlayerDirAction(pi *netmsg.PlayerInput, dir netmsg.Direction) {
+	pi.Actions = append(pi.Actions, &netmsg.MoveAction{Dir: dir})
 }
 
-func addPlayerShootAction(pi *stypes.PlayerInput, target geom.Vector2) {
-	pi.Actions = append(pi.Actions, &stypes.ShootAction{Target: target})
+func addPlayerShootAction(pi *netmsg.PlayerInput, target geom.Vector2) {
+	pi.Actions = append(pi.Actions, &netmsg.ShootAction{Target: target})
 }
 
-func getPlayerInput() *stypes.PlayerInput {
-	playerInput := &stypes.PlayerInput{}
+func getPlayerInput() *netmsg.PlayerInput {
+	playerInput := &netmsg.PlayerInput{}
 
 	// ### WASD ###
 	if rl.IsKeyDown(rl.KeyW) {
-		addPlayerDirAction(playerInput, stypes.UP)
+		addPlayerDirAction(playerInput, netmsg.UP)
 	}
 	if rl.IsKeyDown(rl.KeyS) {
-		addPlayerDirAction(playerInput, stypes.DOWN)
+		addPlayerDirAction(playerInput, netmsg.DOWN)
 	}
 	if rl.IsKeyDown(rl.KeyA) {
-		addPlayerDirAction(playerInput, stypes.LEFT)
+		addPlayerDirAction(playerInput, netmsg.LEFT)
 	}
 	if rl.IsKeyDown(rl.KeyD) {
-		addPlayerDirAction(playerInput, stypes.RIGHT)
+		addPlayerDirAction(playerInput, netmsg.RIGHT)
 	}
 
 	// ### Shoot with mouse ###
@@ -96,7 +96,7 @@ func getPlayerInput() *stypes.PlayerInput {
 	return playerInput
 }
 
-func serverInputHandler(conn *conn.ClientConn, serverInput chan stypes.GameMessage) {
+func serverInputHandler(conn *conn.ClientConn, serverInput chan netmsg.GameMessage) {
 	for {
 		servMsg, err := conn.Recieve()
 		if err != nil {
@@ -107,13 +107,29 @@ func serverInputHandler(conn *conn.ClientConn, serverInput chan stypes.GameMessa
 	}
 }
 
-func getMyHealth(ws *stypes.WorldState, myId uint32) (float32, error) {
+func getMyHealth(ws *netmsg.WorldState, myId uint32) (float32, error) {
 	for _, player := range ws.Players {
 		if player.Id == myId {
 			return player.Health, nil
 		}
 	}
 	return 0, errors.New("player not found in world")
+}
+
+func gatherServerMsgs(serverInput chan netmsg.GameMessage) []netmsg.GameMessage {
+	msgs := []netmsg.GameMessage{}
+	const limit = 30
+
+	for range limit {
+		select {
+		case msg := <-serverInput:
+			msgs = append(msgs, msg)
+		default:
+			return msgs
+		}
+	}
+
+	return msgs
 }
 
 type Status uint
@@ -134,17 +150,17 @@ func main() {
 
 	rl.InitWindow(config.WorldWidth, config.WorldHeight, "CircleWar Client")
 	defer rl.CloseWindow()
-	rl.SetTargetFPS(200)
+	rl.SetTargetFPS(60)
 
-	serverMsg := make(chan stypes.GameMessage)
-	go serverInputHandler(conn, serverMsg)
+	serverInput := make(chan netmsg.GameMessage, 100)
+	go serverInputHandler(conn, serverInput)
 
-	curWorld := &stypes.WorldState{}
+	curWorld := &netmsg.WorldState{}
 	var playerId uint32
 	var lastServerTick uint32 = 0
 	status := NONE
 
-	err = conn.Send(stypes.NewConnectRequest("default"))
+	err = conn.Send(netmsg.NewConnectRequest("default"))
 	if err != nil {
 		fmt.Println("error sending connect request:", err)
 	}
@@ -159,23 +175,23 @@ func main() {
 			}
 		}
 
-		select {
-		case msg := <-serverMsg:
+		servMsgs := gatherServerMsgs(serverInput)
+		fmt.Println("#servmsgs:", len(servMsgs))
+		for _, msg := range servMsgs {
 			switch payload := msg.(type) {
-			case *stypes.WorldState:
+			case *netmsg.WorldState:
 				// fmt.Println("world from server:", *payload, "tick:", payload.TickNum)
 				if payload.TickNum >= lastServerTick {
 					lastServerTick = payload.TickNum
 					curWorld = payload
 				}
-			case *stypes.ConnectAck:
+			case *netmsg.ConnectAck:
 				fmt.Println("got ack")
 				playerId = payload.PlayerId
 				status = ALIVE
-			case *stypes.DeathNote:
+			case *netmsg.DeathNote:
 				status = DEAD
 			}
-		default:
 		}
 
 		myHealth, _ := getMyHealth(curWorld, playerId)
@@ -191,7 +207,7 @@ func main() {
 				X: (config.CameraWidth - bx) / 2, Y: (config.CameraHeight - by) / 2,
 				Width: bx, Height: by,
 			}, "Reconnect") {
-				err := conn.Send(stypes.NewReconnectRequest(playerId))
+				err := conn.Send(netmsg.NewReconnectRequest(playerId))
 				if err != nil {
 					fmt.Println("failed to send reconnect request:", err)
 				}

@@ -5,7 +5,7 @@ import (
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
 	"CircleWar/core/network/gameConn"
-	stypes "CircleWar/core/stypes"
+	stypes "CircleWar/core/netmsg"
 	wstate "CircleWar/server/world_state"
 	"errors"
 	"fmt"

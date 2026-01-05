@@ -1,4 +1,4 @@
-package stypes
+package netmsg
 
 import (
 	"CircleWar/core/geom"
@@ -8,7 +8,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type UDPAddrStr string
 type PlayerHealth float32
 type Direction int32
 

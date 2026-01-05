@@ -1,7 +1,7 @@
 package gameConn
 
 import (
-	stypes "CircleWar/core/stypes"
+	stypes "CircleWar/core/netmsg"
 	"net"
 	"sync"
 )

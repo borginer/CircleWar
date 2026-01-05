@@ -4,7 +4,7 @@ import (
 	"CircleWar/config"
 	"CircleWar/core/geom"
 	"CircleWar/core/hitboxes"
-	stypes "CircleWar/core/stypes"
+	stypes "CircleWar/core/netmsg"
 	"net"
 	"time"
 )
