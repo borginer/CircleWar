@@ -6,7 +6,8 @@ import (
 	"CircleWar/core/hitboxes"
 	stypes "CircleWar/core/netmsg"
 	"CircleWar/core/network/gameConn"
-	envloader "CircleWar/env_loader"
+	envdata "CircleWar/env/env_data"
+	envloader "CircleWar/env/env_loader"
 	wstate "CircleWar/server/world_state"
 	"errors"
 	"fmt"
@@ -223,8 +224,8 @@ func notifyDeadPlayers(sw *wstate.ServerWorld, conn *gameConn.ServerConn, player
 }
 
 func main() {
-	envloader.LoadFile(".env")
-	serverIp := envloader.GetEnv("SERVER_IP", "127.0.0.1")
+	envloader.LoadFile(envdata.EnvfilePath())
+	serverIp := envloader.GetEnv("SERVER_IP", "0.0.0.0")
 
 	conn, err := gameConn.NewServerConn(net.ParseIP(serverIp), port)
 	if err != nil {

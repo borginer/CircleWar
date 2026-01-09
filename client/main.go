@@ -6,7 +6,8 @@ import (
 	"CircleWar/core/hitboxes"
 	"CircleWar/core/netmsg"
 	conn "CircleWar/core/network/gameConn"
-	envloader "CircleWar/env_loader"
+	envdata "CircleWar/env/env_data"
+	envloader "CircleWar/env/env_loader"
 	"errors"
 	"fmt"
 	"log"
@@ -146,8 +147,9 @@ const (
 )
 
 func main() {
-	envloader.LoadFile(".env")
+	envloader.LoadFile(envdata.EnvfilePath())
 	serverIp := envloader.GetEnv("SERVER_IP", "127.0.0.1")
+
 	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", serverIp, port))
 	conn, err := conn.NewClientConn(serverAddr)
 	if err != nil {
