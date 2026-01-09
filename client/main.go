@@ -6,6 +6,7 @@ import (
 	"CircleWar/core/hitboxes"
 	"CircleWar/core/netmsg"
 	conn "CircleWar/core/network/gameConn"
+	envloader "CircleWar/env_loader"
 	"errors"
 	"fmt"
 	"log"
@@ -18,8 +19,7 @@ import (
 )
 
 const (
-	port     = config.Port
-	serverIP = config.ServerIP
+	port = config.Port
 )
 
 func drawWorld(world *netmsg.WorldState, myId uint32) {
@@ -127,6 +127,7 @@ func gatherServerMsgs(serverInput chan netmsg.GameMessage) []netmsg.GameMessage 
 	for range limit {
 		select {
 		case msg := <-serverInput:
+			fmt.Println("input from server")
 			msgs = append(msgs, msg)
 		default:
 			return msgs
@@ -145,7 +146,9 @@ const (
 )
 
 func main() {
-	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", serverIP, port))
+	envloader.LoadFile(".env")
+	serverIp := envloader.GetEnv("SERVER_IP", "127.0.0.1")
+	serverAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", serverIp, port))
 	conn, err := conn.NewClientConn(serverAddr)
 	if err != nil {
 		log.Fatal(err)
@@ -180,7 +183,8 @@ func main() {
 		}
 
 		servMsgs := gatherServerMsgs(serverInput)
-		fmt.Println("#servmsgs:", len(servMsgs))
+		// fmt.Println("#servmsgs:", len(servMsgs))
+
 		for _, msg := range servMsgs {
 			switch payload := msg.(type) {
 			case *netmsg.WorldState:

@@ -6,6 +6,7 @@ import (
 	"CircleWar/core/hitboxes"
 	stypes "CircleWar/core/netmsg"
 	"CircleWar/core/network/gameConn"
+	envloader "CircleWar/env_loader"
 	wstate "CircleWar/server/world_state"
 	"errors"
 	"fmt"
@@ -222,12 +223,15 @@ func notifyDeadPlayers(sw *wstate.ServerWorld, conn *gameConn.ServerConn, player
 }
 
 func main() {
-	conn, err := gameConn.NewServerConn(net.ParseIP(config.ServerIP), port)
+	envloader.LoadFile(".env")
+	serverIp := envloader.GetEnv("SERVER_IP", "127.0.0.1")
+
+	conn, err := gameConn.NewServerConn(net.ParseIP(serverIp), port)
 	if err != nil {
-		log.Fatal("whoops")
+		log.Fatal("whoops:", err)
 	}
 	defer conn.Close()
-	fmt.Printf("Listening on udp port %d\n", port)
+	fmt.Printf("Listening on udp %s:%d\n", serverIp, port)
 
 	serverWorld := wstate.NewServerWorld()
 	clock := time.Tick(time.Second / ticksPerSecond)
